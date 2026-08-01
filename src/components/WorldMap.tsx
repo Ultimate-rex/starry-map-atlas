@@ -8,6 +8,9 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
 import admin1 from "@/data/admin1-top20.json";
 import { TOUR } from "@/data/tour";
+import { computeMetrics } from "@/lib/geoMetrics";
+import { MeasureLayer } from "@/components/MeasureLayer";
+import { MetricsHud } from "@/components/MetricsHud";
 
 type CountryProps = { name: string };
 type StateProps = { name: string | null };
