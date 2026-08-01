@@ -2,6 +2,7 @@ import { useMemo, useEffect, useState, useRef } from "react";
 import { geoEquirectangular, geoPath, geoGraticule10 } from "d3-geo";
 import { select } from "d3-selection";
 import { zoom, type ZoomBehavior } from "d3-zoom";
+import "d3-transition";
 import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
