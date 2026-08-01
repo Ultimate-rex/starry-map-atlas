@@ -16,7 +16,8 @@ export function WorldMap() {
     if (!el) return;
     const update = () => {
       const w = el.clientWidth;
-      setSize({ width: w, height: Math.round(w * 0.52) });
+      const h = el.clientHeight || window.innerHeight;
+      setSize({ width: w, height: h });
     };
     update();
     const ro = new ResizeObserver(update);

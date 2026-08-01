@@ -25,16 +25,8 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center px-6 py-16">
-      <header className="mb-10 text-center">
-        <h1 className="text-3xl md:text-5xl font-light tracking-[0.3em] uppercase">
-          World Map
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground tracking-widest uppercase">
-          Natural Earth projection · D3
-        </p>
-      </header>
-      <div className="w-full max-w-6xl">
+    <main className="h-screen w-screen bg-background overflow-hidden flex items-center justify-center">
+      <div className="w-full h-full">
         <WorldMap />
       </div>
     </main>
