@@ -236,8 +236,29 @@ export function WorldMap() {
               ))}
             </g>
           )}
+
+          {showStates && activeFeature && (
+            <MeasureLayer
+              feature={activeFeature}
+              projection={projection}
+              k={transform.k}
+              runKey={`${index}-measure`}
+            />
+          )}
         </g>
       </svg>
+
+      {/* Measurement read-out */}
+      {showStates && metrics && (
+        <MetricsHud
+          label={stop.label}
+          metrics={metrics}
+          states={statePaths.length}
+          runKey={index}
+        />
+      )}
+
+
 
       {/* Country label */}
       {showLabel && (
