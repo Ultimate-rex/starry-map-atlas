@@ -67,6 +67,7 @@ export function WorldMap() {
     return {
       countries: fc.features,
       path: p,
+      projection,
       graticule: p(geoGraticule10()) ?? "",
     };
   }, [size.width, size.height]);
