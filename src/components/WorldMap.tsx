@@ -31,7 +31,7 @@ export function WorldMap() {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
-  const stop = TOUR[index];
+  const stop = TOUR[index] ?? TOUR[0]!;
 
   /* ---------------- responsive sizing ---------------- */
   useEffect(() => {
