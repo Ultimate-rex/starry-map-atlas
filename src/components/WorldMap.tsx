@@ -57,7 +57,7 @@ export function WorldMap() {
         role="img"
         aria-label="World map of all countries"
       >
-        <path d={outline} className="fill-background stroke-border" strokeWidth={1} />
+        <path d={outline} className="fill-transparent" strokeWidth={0} />
         <path
           d={graticule}
           fill="none"
@@ -82,9 +82,6 @@ export function WorldMap() {
           ))}
         </g>
       </svg>
-      <p className="mt-4 h-5 text-center text-sm tracking-[0.25em] uppercase text-muted-foreground">
-        {hovered ?? ""}
-      </p>
     </div>
   );
 }
