@@ -136,6 +136,13 @@ export function WorldMap() {
       .filter((s) => s.d.length > 0);
   }, [stop.admin1Key, path]);
 
+  /* ---------------- measured geometry for the focused country ---------------- */
+  const activeFeature = countryByName.get(stop.worldName) ?? null;
+  const metrics = useMemo(
+    () => (activeFeature ? computeMetrics(activeFeature) : null),
+    [activeFeature],
+  );
+
   const stagger = Math.min(70, 2200 / Math.max(statePaths.length, 1));
   const drawMs = 900 + stagger * statePaths.length;
 
