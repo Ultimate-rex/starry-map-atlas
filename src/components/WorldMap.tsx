@@ -8,6 +8,9 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
 import admin1 from "@/data/admin1-top20.json";
 import { TOUR } from "@/data/tour";
+import { computeMetrics } from "@/lib/geoMetrics";
+import { MeasureLayer } from "@/components/MeasureLayer";
+import { MetricsHud } from "@/components/MetricsHud";
 
 type CountryProps = { name: string };
 type StateProps = { name: string | null };
@@ -49,7 +52,7 @@ export function WorldMap() {
   }, []);
 
   /* ---------------- geo setup ---------------- */
-  const { countries, path, graticule } = useMemo(() => {
+  const { countries, path, projection, graticule } = useMemo(() => {
     const fc = feature(
       worldData as never,
       (worldData as never as { objects: { countries: unknown } }).objects
@@ -67,6 +70,7 @@ export function WorldMap() {
     return {
       countries: fc.features,
       path: p,
+      projection,
       graticule: p(geoGraticule10()) ?? "",
     };
   }, [size.width, size.height]);
@@ -134,6 +138,13 @@ export function WorldMap() {
       .map((f) => ({ d: path(f) ?? "", name: f.properties?.name ?? null }))
       .filter((s) => s.d.length > 0);
   }, [stop.admin1Key, path]);
+
+  /* ---------------- measured geometry for the focused country ---------------- */
+  const activeFeature = countryByName.get(stop.worldName) ?? null;
+  const metrics = useMemo(
+    () => (activeFeature ? computeMetrics(activeFeature) : null),
+    [activeFeature],
+  );
 
   const stagger = Math.min(70, 2200 / Math.max(statePaths.length, 1));
   const drawMs = 900 + stagger * statePaths.length;
@@ -225,8 +236,29 @@ export function WorldMap() {
               ))}
             </g>
           )}
+
+          {showStates && activeFeature && (
+            <MeasureLayer
+              feature={activeFeature}
+              projection={projection}
+              k={transform.k}
+              runKey={`${index}-measure`}
+            />
+          )}
         </g>
       </svg>
+
+      {/* Measurement read-out */}
+      {showStates && metrics && (
+        <MetricsHud
+          label={stop.label}
+          metrics={metrics}
+          states={statePaths.length}
+          runKey={index}
+        />
+      )}
+
+
 
       {/* Country label */}
       {showLabel && (
