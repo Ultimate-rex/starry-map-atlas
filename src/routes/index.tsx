@@ -1,24 +1,42 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { WorldMap } from "@/components/WorldMap";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "World Map — Interactive D3 Country Atlas" },
+      {
+        name: "description",
+        content:
+          "A minimal black-and-white interactive world map of every country, rendered with D3 geographic projections.",
+      },
+      { property: "og:title", content: "World Map — Interactive D3 Country Atlas" },
+      {
+        property: "og:description",
+        content:
+          "A minimal black-and-white interactive world map of every country, rendered with D3.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center px-6 py-16">
+      <header className="mb-10 text-center">
+        <h1 className="text-3xl md:text-5xl font-light tracking-[0.3em] uppercase">
+          World Map
+        </h1>
+        <p className="mt-3 text-sm text-muted-foreground tracking-widest uppercase">
+          Natural Earth projection · D3
+        </p>
+      </header>
+      <div className="w-full max-w-6xl">
+        <WorldMap />
+      </div>
+    </main>
   );
 }
