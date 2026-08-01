@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState, useRef } from "react";
-import { geoNaturalEarth1, geoPath, geoGraticule10 } from "d3-geo";
+import { geoEquirectangular, geoPath, geoGraticule10 } from "d3-geo";
 import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
@@ -32,10 +32,10 @@ export function WorldMap() {
         .countries as never,
     ) as unknown as FeatureCollection<Geometry, CountryProps>;
 
-    const projection = geoNaturalEarth1().fitExtent(
+    const projection = geoEquirectangular().fitExtent(
       [
-        [12, 12],
-        [size.width - 12, size.height - 12],
+        [0, 0],
+        [size.width, size.height],
       ],
       { type: "Sphere" },
     );
