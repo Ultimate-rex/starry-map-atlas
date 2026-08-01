@@ -49,7 +49,7 @@ export function WorldMap() {
   }, []);
 
   /* ---------------- geo setup ---------------- */
-  const { countries, path, graticule } = useMemo(() => {
+  const { countries, path, projection, graticule } = useMemo(() => {
     const fc = feature(
       worldData as never,
       (worldData as never as { objects: { countries: unknown } }).objects
