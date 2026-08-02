@@ -147,10 +147,18 @@
 :root {
   --state-line: oklch(0.72 0.17 250);
   --state-glow: oklch(0.72 0.17 250 / 45%);
+  --focus-line: oklch(0.82 0.19 155);
+  --focus-glow: oklch(0.82 0.19 155 / 50%);
 }
 
 @theme inline {
   --color-state-line: var(--state-line);
+  --color-focus-line: var(--focus-line);
+}
+
+.mono-hud {
+  font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes state-draw {
