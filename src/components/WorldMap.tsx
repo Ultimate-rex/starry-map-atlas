@@ -21,7 +21,15 @@ const ADMIN1 = admin1 as unknown as Record<
   FeatureCollection<Geometry, StateProps>
 >;
 
+/** world-atlas name -> admin1-top20 key */
+const ADMIN1_ALIAS: Record<string, string> = {
+  "Dem. Rep. Congo": "Democratic Republic of the Congo",
+};
+
 const TIMING = { fly: 1600, hold: 1500, out: 1400 } as const;
+
+const GREEN = "var(--focus-line)";
+const GREEN_GLOW = "var(--focus-glow)";
 
 export function WorldMap() {
   const [size, setSize] = useState({ width: 1200, height: 620 });
@@ -29,6 +37,7 @@ export function WorldMap() {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("fly");
   const [playing, setPlaying] = useState(true);
+  const [focusName, setFocusName] = useState<string | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -51,7 +60,7 @@ export function WorldMap() {
     return () => ro.disconnect();
   }, []);
 
-  /* ---------------- geo setup ---------------- */
+  /* ---------------- geo setup (perfectly flat, edge-to-edge) ---------------- */
   const { countries, path, projection, graticule } = useMemo(() => {
     const fc = feature(
       worldData as never,
@@ -59,13 +68,13 @@ export function WorldMap() {
         .countries as never,
     ) as unknown as FeatureCollection<Geometry, CountryProps>;
 
-    const projection = geoEquirectangular().fitExtent(
-      [
-        [0, 0],
-        [size.width, size.height],
-      ],
-      { type: "Sphere" },
-    );
+    // Plate carrée: independent x/y scaling so the map is a flat rectangle
+    // that fills the viewport with zero tilt or letterboxing.
+    const projection = geoEquirectangular()
+      .scale(size.width / (2 * Math.PI))
+      .translate([size.width / 2, size.height / 2])
+      .precision(0.1);
+
     const p = geoPath(projection);
     return {
       countries: fc.features,
@@ -130,6 +139,47 @@ export function WorldMap() {
     [countryByName, path, size.width, size.height],
   );
 
+  /* ---------------- focused (clicked) country ---------------- */
+  const focusFeature = focusName ? (countryByName.get(focusName) ?? null) : null;
+
+  const focusStatePaths = useMemo(() => {
+    if (!focusName) return [] as { d: string; name: string | null }[];
+    const key = ADMIN1_ALIAS[focusName] ?? focusName;
+    const fc = ADMIN1[key];
+    if (!fc) return [];
+    return fc.features
+      .map((f) => ({ d: path(f) ?? "", name: f.properties?.name ?? null }))
+      .filter((s) => s.d.length > 0);
+  }, [focusName, path]);
+
+  const focusMetrics = useMemo(
+    () => (focusFeature ? computeMetrics(focusFeature) : null),
+    [focusFeature],
+  );
+
+  const focusCentroid = useMemo(
+    () => (focusFeature ? path.centroid(focusFeature) : null),
+    [focusFeature, path],
+  );
+
+  const handleCountryClick = useCallback(
+    (name: string) => {
+      if (focusName === name) {
+        // second click on the same country -> zoom out and resume the loop
+        setFocusName(null);
+        flyTo({ k: 1, x: 0, y: 0 }, TIMING.out);
+        setPhase("fly");
+        setPlaying(true);
+        return;
+      }
+      setFocusName(name);
+      setPlaying(false);
+      const t = targetFor(name);
+      if (t) flyTo(t, TIMING.fly);
+    },
+    [focusName, flyTo, targetFor],
+  );
+
   /* ---------------- state (admin-1) borders for current stop ---------------- */
   const statePaths = useMemo(() => {
     const fc = ADMIN1[stop.admin1Key];
@@ -148,10 +198,11 @@ export function WorldMap() {
 
   const stagger = Math.min(70, 2200 / Math.max(statePaths.length, 1));
   const drawMs = 900 + stagger * statePaths.length;
+  const focusStagger = Math.min(70, 2200 / Math.max(focusStatePaths.length, 1));
 
   /* ---------------- the timeline ---------------- */
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || focusName) return;
     let timer: ReturnType<typeof setTimeout>;
 
     if (phase === "fly") {
@@ -171,16 +222,19 @@ export function WorldMap() {
     }
 
     return () => clearTimeout(timer);
-  }, [phase, index, playing, stop.worldName, targetFor, flyTo, drawMs]);
+  }, [phase, index, playing, focusName, stop.worldName, targetFor, flyTo, drawMs]);
 
   const goTo = (i: number) => {
+    setFocusName(null);
     setIndex((i + TOUR.length) % TOUR.length);
     setPhase("fly");
     setPlaying(true);
   };
 
-  const showStates = phase === "draw" || phase === "hold";
-  const showLabel = phase === "draw" || phase === "hold" || phase === "out";
+  const tourActive = !focusName;
+  const showStates = tourActive && (phase === "draw" || phase === "hold");
+  const showLabel =
+    tourActive && (phase === "draw" || phase === "hold" || phase === "out");
 
   return (
     <div ref={wrapRef} className="relative w-full h-full overflow-hidden">
@@ -191,7 +245,7 @@ export function WorldMap() {
         viewBox={`0 0 ${size.width} ${size.height}`}
         className="w-full h-full block"
         role="img"
-        aria-label="Animated world map tour of the 20 largest countries"
+        aria-label="Animated flat world map tour of the 20 largest countries"
         style={{ background: "#000", touchAction: "none" }}
       >
         <g
@@ -205,15 +259,36 @@ export function WorldMap() {
           />
 
           {countries.map((c, i) => {
-            const active = c.properties?.name === stop.worldName;
+            const name = c.properties?.name;
+            const active = !focusName && name === stop.worldName;
+            const focused = name === focusName;
             return (
               <path
                 key={(c.id as string) ?? i}
                 d={path(c) ?? ""}
-                fill={active ? "rgba(255,255,255,0.06)" : "transparent"}
-                className={active ? "stroke-white" : "stroke-white/70"}
-                strokeWidth={(active ? 1.1 : 0.6) / transform.k}
+                fill={
+                  focused
+                    ? "rgba(52,211,153,0.08)"
+                    : active
+                      ? "rgba(255,255,255,0.06)"
+                      : "transparent"
+                }
+                stroke={focused ? GREEN : undefined}
+                className={
+                  focused
+                    ? "cursor-pointer"
+                    : active
+                      ? "stroke-white cursor-pointer"
+                      : "stroke-white/70 cursor-pointer"
+                }
+                strokeWidth={(focused ? 1.4 : active ? 1.1 : 0.6) / transform.k}
                 strokeLinejoin="round"
+                onClick={() => name && handleCountryClick(name)}
+                style={
+                  focused
+                    ? { filter: `drop-shadow(0 0 4px ${GREEN_GLOW})` }
+                    : undefined
+                }
               />
             );
           })}
@@ -245,6 +320,41 @@ export function WorldMap() {
               runKey={`${index}-measure`}
             />
           )}
+
+          {/* clicked country: green state borders + slow orbit sweep */}
+          {focusFeature && focusCentroid && (
+            <g
+              key={`focus-${focusName}`}
+              className="focus-spin"
+              style={{
+                transformOrigin: `${focusCentroid[0]}px ${focusCentroid[1]}px`,
+              }}
+              pointerEvents="none"
+            >
+              {focusStatePaths.map((s, i) => (
+                <path
+                  key={`f-${s.name ?? i}-${i}`}
+                  d={s.d}
+                  className="state-path state-path-focus"
+                  pathLength={1}
+                  strokeWidth={1 / transform.k}
+                  strokeDasharray={1}
+                  style={{
+                    animationDelay: `${i * focusStagger}ms`,
+                    filter: `drop-shadow(0 0 3px ${GREEN_GLOW})`,
+                  }}
+                />
+              ))}
+              <MeasureLayer
+                feature={focusFeature}
+                projection={projection}
+                k={transform.k}
+                runKey={`focus-${focusName}-measure`}
+                color={GREEN}
+                glow={GREEN_GLOW}
+              />
+            </g>
+          )}
         </g>
       </svg>
 
@@ -258,7 +368,15 @@ export function WorldMap() {
         />
       )}
 
-
+      {focusMetrics && focusName && (
+        <MetricsHud
+          label={focusName}
+          metrics={focusMetrics}
+          states={focusStatePaths.length}
+          runKey={focusName}
+          accent="focus"
+        />
+      )}
 
       {/* Country label */}
       {showLabel && (
@@ -273,6 +391,21 @@ export function WorldMap() {
             className={`${phase === "out" ? "label-out" : "label-in"} mt-3 text-xs tracking-[0.4em] uppercase text-muted-foreground`}
           >
             {statePaths.length} states / provinces
+          </span>
+        </div>
+      )}
+
+      {focusName && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 flex flex-col items-center">
+          <h1
+            key={`focus-${focusName}`}
+            className="label-in text-3xl md:text-5xl font-light uppercase"
+            style={{ color: "var(--focus-line)" }}
+          >
+            {focusName}
+          </h1>
+          <span className="label-in mt-3 text-xs tracking-[0.4em] uppercase text-muted-foreground">
+            locked — click again to zoom out
           </span>
         </div>
       )}
@@ -297,10 +430,19 @@ export function WorldMap() {
         </button>
         <button
           type="button"
-          onClick={() => setPlaying((p) => !p)}
+          onClick={() => {
+            if (focusName) {
+              setFocusName(null);
+              flyTo({ k: 1, x: 0, y: 0 }, TIMING.out);
+              setPhase("fly");
+              setPlaying(true);
+              return;
+            }
+            setPlaying((p) => !p);
+          }}
           className="h-10 px-5 rounded-full border border-white/25 bg-black/60 text-xs uppercase tracking-[0.3em] text-foreground hover:bg-white/10 transition-colors"
         >
-          {playing ? "Pause" : "Play"}
+          {focusName ? "Release" : playing ? "Pause" : "Play"}
         </button>
         <button
           type="button"
