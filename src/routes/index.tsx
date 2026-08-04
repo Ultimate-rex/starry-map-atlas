@@ -31,7 +31,7 @@ function Index() {
       </div>
       <Link
         to="/lohardaga"
-        className="absolute right-5 top-5 rounded-full border border-emerald-400/50 bg-black/70 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-emerald-300 hover:bg-emerald-400/15 transition-colors"
+        className="absolute left-5 bottom-5 rounded-full border border-emerald-400/50 bg-black/70 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-emerald-300 hover:bg-emerald-400/15 transition-colors"
       >
         Lohardaga / JH atlas
       </Link>
