@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorldMap } from "@/components/WorldMap";
 
 export const Route = createFileRoute("/")({
@@ -29,6 +29,13 @@ function Index() {
       <div className="w-full h-full">
         <WorldMap />
       </div>
+      <Link
+        to="/lohardaga"
+        className="absolute left-5 bottom-5 rounded-full border border-emerald-400/50 bg-black/70 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-emerald-300 hover:bg-emerald-400/15 transition-colors"
+      >
+        Lohardaga / JH atlas
+      </Link>
     </main>
   );
 }
+

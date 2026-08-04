@@ -7,6 +7,8 @@ import { feature } from "topojson-client";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
 import admin1 from "@/data/admin1-top20.json";
+import indiaOutline from "@/data/india-outline.json";
+import jhDistricts from "@/data/jharkhand-districts.json";
 import { TOUR } from "@/data/tour";
 import { computeMetrics } from "@/lib/geoMetrics";
 import { MeasureLayer } from "@/components/MeasureLayer";
@@ -21,15 +23,41 @@ const ADMIN1 = admin1 as unknown as Record<
   FeatureCollection<Geometry, StateProps>
 >;
 
+/** Official India national outline (includes J&K and Ladakh in full). */
+const INDIA = indiaOutline as unknown as Feature<Geometry, CountryProps>;
+
+const JH = jhDistricts as unknown as FeatureCollection<Geometry, StateProps>;
+
 /** world-atlas name -> admin1-top20 key */
 const ADMIN1_ALIAS: Record<string, string> = {
   "Dem. Rep. Congo": "Democratic Republic of the Congo",
+};
+
+/**
+ * Countries whose projected bounds are useless (they cross the antimeridian,
+ * or have far-flung territories). Zoom uses this lon/lat box instead.
+ */
+const BBOX_OVERRIDE: Record<string, [number, number, number, number]> = {
+  Russia: [28, 41, 179.5, 78],
+  "United States of America": [-125, 24, -66.5, 49.5],
+  France: [-5.2, 41.3, 9.6, 51.1],
+  Norway: [4.5, 57.9, 31.2, 71.2],
+  "New Zealand": [166, -47.4, 178.6, -34.3],
+  Fiji: [177, -19.2, 180, -16],
+  Kiribati: [-160, -3, -150, 4],
+  Netherlands: [3.3, 50.7, 7.3, 53.6],
+  Denmark: [8, 54.5, 15.2, 57.8],
+  Chile: [-75.7, -55.9, -66.4, -17.5],
+  Ecuador: [-81.1, -5.1, -75.2, 1.5],
+  Portugal: [-9.6, 36.9, -6.1, 42.2],
+  Spain: [-9.4, 36, 3.4, 43.8],
 };
 
 const TIMING = { fly: 1600, hold: 1500, out: 1400 } as const;
 
 const GREEN = "var(--focus-line)";
 const GREEN_GLOW = "var(--focus-glow)";
+
 
 export function WorldMap() {
   const [size, setSize] = useState({ width: 1200, height: 620 });
@@ -87,8 +115,26 @@ export function WorldMap() {
   const countryByName = useMemo(() => {
     const m = new Map<string, Feature<Geometry, CountryProps>>();
     for (const c of countries) if (c.properties?.name) m.set(c.properties.name, c);
+    // Use the official Indian national boundary (full J&K + Ladakh extent).
+    m.set("India", INDIA);
     return m;
   }, [countries]);
+
+  /** Countries drawn on the base layer, with India swapped for the official outline. */
+  const drawnCountries = useMemo(
+    () => countries.map((c) => (c.properties?.name === "India" ? INDIA : c)),
+    [countries],
+  );
+
+  /** Jharkhand district borders, drawn when India is the active country. */
+  const jhPaths = useMemo(
+    () =>
+      JH.features
+        .map((f) => ({ d: path(f) ?? "", name: f.properties?.name ?? null }))
+        .filter((s) => s.d.length > 0),
+    [path],
+  );
+
 
   /* ---------------- zoom behaviour ---------------- */
   useEffect(() => {
@@ -121,9 +167,22 @@ export function WorldMap() {
 
   const targetFor = useCallback(
     (worldName: string) => {
-      const f = countryByName.get(worldName);
-      if (!f) return null;
-      const [[x0, y0], [x1, y1]] = path.bounds(f);
+      const box = BBOX_OVERRIDE[worldName];
+      let x0: number, y0: number, x1: number, y1: number;
+
+      if (box) {
+        const a = projection([box[0], box[3]]);
+        const b = projection([box[2], box[1]]);
+        if (!a || !b) return null;
+        [x0, y0] = a;
+        [x1, y1] = b;
+      } else {
+        const f = countryByName.get(worldName);
+        if (!f) return null;
+        const bounds = path.bounds(f);
+        [[x0, y0], [x1, y1]] = bounds;
+      }
+
       const w = Math.max(x1 - x0, 1);
       const h = Math.max(y1 - y0, 1);
       const k = Math.max(
@@ -136,8 +195,9 @@ export function WorldMap() {
         y: size.height / 2 - (k * (y0 + y1)) / 2,
       };
     },
-    [countryByName, path, size.width, size.height],
+    [countryByName, path, projection, size.width, size.height],
   );
+
 
   /* ---------------- focused (clicked) country ---------------- */
   const focusFeature = focusName ? (countryByName.get(focusName) ?? null) : null;
@@ -258,20 +318,20 @@ export function WorldMap() {
             strokeWidth={0.4 / transform.k}
           />
 
-          {countries.map((c, i) => {
+          {drawnCountries.map((c, i) => {
             const name = c.properties?.name;
             const active = !focusName && name === stop.worldName;
             const focused = name === focusName;
             return (
               <path
-                key={(c.id as string) ?? i}
+                key={(c.id as string) ?? name ?? i}
                 d={path(c) ?? ""}
                 fill={
                   focused
                     ? "rgba(52,211,153,0.08)"
                     : active
                       ? "rgba(255,255,255,0.06)"
-                      : "transparent"
+                      : "rgba(255,255,255,0.012)"
                 }
                 stroke={focused ? GREEN : undefined}
                 className={
@@ -279,10 +339,11 @@ export function WorldMap() {
                     ? "cursor-pointer"
                     : active
                       ? "stroke-white cursor-pointer"
-                      : "stroke-white/70 cursor-pointer"
+                      : "stroke-white/45 cursor-pointer"
                 }
-                strokeWidth={(focused ? 1.4 : active ? 1.1 : 0.6) / transform.k}
+                strokeWidth={(focused ? 1.6 : active ? 1.3 : 0.75) / transform.k}
                 strokeLinejoin="round"
+                strokeLinecap="round"
                 onClick={() => name && handleCountryClick(name)}
                 style={
                   focused
@@ -292,6 +353,7 @@ export function WorldMap() {
               />
             );
           })}
+
 
           {showStates && (
             <g key={`${index}-states`}>
@@ -311,6 +373,29 @@ export function WorldMap() {
               ))}
             </g>
           )}
+
+          {/* Jharkhand district borders, drawn whenever India is on screen */}
+          {(focusName === "India" ||
+            (showStates && stop.worldName === "India")) && (
+            <g key="jh-districts" pointerEvents="none">
+              {jhPaths.map((s, i) => (
+                <path
+                  key={`jh-${s.name ?? i}`}
+                  d={s.d}
+                  className="state-path state-path-focus"
+                  pathLength={1}
+                  strokeDasharray={1}
+                  strokeWidth={0.5 / transform.k}
+                  style={{
+                    animationDelay: `${600 + i * 40}ms`,
+                    filter: `drop-shadow(0 0 2px ${GREEN_GLOW})`,
+                  }}
+                />
+              ))}
+            </g>
+          )}
+
+
 
           {showStates && activeFeature && (
             <MeasureLayer
