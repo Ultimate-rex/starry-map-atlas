@@ -2,25 +2,25 @@
 
 export type IpInfo = {
   ip: string;
-  city?: string;
-  region?: string;
-  country?: string;
-  org?: string;
-  lat?: number;
-  lon?: number;
-  timezone?: string;
+  city?: string | undefined;
+  region?: string | undefined;
+  country?: string | undefined;
+  org?: string | undefined;
+  lat?: number | undefined;
+  lon?: number | undefined;
+  timezone?: string | undefined;
 };
 
 export type PlaceInfo = {
   displayName: string;
-  road?: string;
-  suburb?: string;
-  village?: string;
-  city?: string;
-  district?: string;
-  state?: string;
-  postcode?: string;
-  country?: string;
+  road?: string | undefined;
+  suburb?: string | undefined;
+  village?: string | undefined;
+  city?: string | undefined;
+  district?: string | undefined;
+  state?: string | undefined;
+  postcode?: string | undefined;
+  country?: string | undefined;
 };
 
 export type Fix = {
@@ -74,7 +74,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<PlaceInf
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) throw new Error("Reverse geocode failed");
   const j = (await r.json()) as {
-    display_name?: string;
+    display_name?: string | undefined;
     address?: Record<string, string>;
   };
   const a = j.address ?? {};
