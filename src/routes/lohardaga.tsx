@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { geoMercator, geoPath } from "d3-geo";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Feature, Geometry } from "geojson";
 import lohardaga from "@/data/lohardaga.json";
 import { JharkhandMap } from "@/components/JharkhandMap";
-import { SatelliteView } from "@/components/SatelliteView";
+import { SatelliteCanvas } from "@/components/SatelliteCanvas";
+import { JharkhandStarlight } from "@/components/JharkhandStarlight";
 import {
   JH_CONTACTS,
   JH_DISTRICTS,
@@ -74,6 +75,7 @@ function Page() {
   const totalPop = JH_DISTRICTS.reduce((s, d) => s + d.population2011, 0);
   const totalArea = JH_DISTRICTS.reduce((s, d) => s + d.areaKm2, 0);
   const maxPop = sorted[0]!.population2011;
+  const [starlight, setStarlight] = useState(false);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -94,11 +96,12 @@ function Page() {
         </p>
 
         <section className="mt-8 grid gap-6 md:grid-cols-2">
-          <SatelliteView
+          <SatelliteCanvas
             lat={LOHARDAGA.lat}
             lon={LOHARDAGA.lon}
-            radius={2}
-            label="Lohardaga"
+            zoom={11}
+            markers={[{ lat: LOHARDAGA.lat, lon: LOHARDAGA.lon, radar: true }]}
+            className="h-[320px] w-full rounded-lg border border-white/15"
           />
           <div className="rounded-lg border border-white/15 p-4">
             <h2 className="mono-hud text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
@@ -127,7 +130,7 @@ function Page() {
             district for its census read-out.
           </p>
           <div className="mt-4 rounded-lg border border-white/15 overflow-hidden">
-            <JharkhandMap highlight="Lohardaga" />
+            <JharkhandMap highlight="Lohardaga" onSelect={() => setStarlight(true)} />
           </div>
         </section>
 
@@ -188,6 +191,7 @@ function Page() {
           <ContactCard title="Jharkhand state contacts" items={JH_CONTACTS} />
         </section>
       </div>
+      {starlight && <JharkhandStarlight onClose={() => setStarlight(false)} />}
     </main>
   );
 }
