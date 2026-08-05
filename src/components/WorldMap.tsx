@@ -13,6 +13,7 @@ import { TOUR } from "@/data/tour";
 import { computeMetrics } from "@/lib/geoMetrics";
 import { MeasureLayer } from "@/components/MeasureLayer";
 import { MetricsHud } from "@/components/MetricsHud";
+import { JharkhandStarlight } from "@/components/JharkhandStarlight";
 
 type CountryProps = { name: string };
 type StateProps = { name: string | null };
@@ -66,6 +67,7 @@ export function WorldMap() {
   const [phase, setPhase] = useState<Phase>("fly");
   const [playing, setPlaying] = useState(true);
   const [focusName, setFocusName] = useState<string | null>(null);
+  const [starlight, setStarlight] = useState(false);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -377,7 +379,7 @@ export function WorldMap() {
           {/* Jharkhand district borders, drawn whenever India is on screen */}
           {(focusName === "India" ||
             (showStates && stop.worldName === "India")) && (
-            <g key="jh-districts" pointerEvents="none">
+            <g key="jh-districts" onClick={() => setStarlight(true)} className="cursor-pointer">
               {jhPaths.map((s, i) => (
                 <path
                   key={`jh-${s.name ?? i}`}
@@ -386,6 +388,7 @@ export function WorldMap() {
                   pathLength={1}
                   strokeDasharray={1}
                   strokeWidth={0.5 / transform.k}
+                  fill="rgba(52,211,153,0.05)"
                   style={{
                     animationDelay: `${600 + i * 40}ms`,
                     filter: `drop-shadow(0 0 2px ${GREEN_GLOW})`,
@@ -538,6 +541,8 @@ export function WorldMap() {
           ›
         </button>
       </div>
+
+      {starlight && <JharkhandStarlight onClose={() => setStarlight(false)} />}
 
       {/* Counter */}
       <div className="pointer-events-none absolute left-5 top-5 text-xs tracking-[0.35em] uppercase text-muted-foreground">
