@@ -38,6 +38,9 @@ export function JharkhandStarlight({ onClose, target }: Props) {
   const [voiceOn, setVoiceOn] = useState(false);
   const [heard, setHeard] = useState("");
   const [clock, setClock] = useState("");
+  const [region, setRegion] = useState<PlaceInfo | null>(null);
+  const [outside, setOutside] = useState(false);
+
 
 
   const push = useCallback(
