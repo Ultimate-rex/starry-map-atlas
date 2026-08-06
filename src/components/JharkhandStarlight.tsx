@@ -149,14 +149,27 @@ export function JharkhandStarlight({ onClose }: Props) {
     setVoiceOn(true);
   }, [listening, onClose, push, runTrace, speak]);
 
-  const markers = useMemo<Marker[]>(() => {
-    const m: Marker[] = [{ lat: JH.lat, lon: JH.lon, kind: "target", radar: true }];
-    if (fix) m.push({ lat: fix.lat, lon: fix.lon, kind: "you", radar: true });
-    return m;
-  }, [fix]);
+  /* the console opens on the India frame and immediately asks for the live fix */
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void runTrace();
+  }, [runTrace]);
 
-  const focus = fix ?? JH;
-  const zoom = fix ? 13 : JH.zoom;
+  const markers = useMemo<Marker[]>(
+    () => (fix ? [{ lat: fix.lat, lon: fix.lon, kind: "you", radar: true }] : []),
+    [fix],
+  );
+
+  const stills = useMemo(
+    () => (fix ? satelliteStills(fix.lat, fix.lon) : []),
+    [fix],
+  );
+
+  const focus = fix ?? INDIA;
+  const zoom = fix ? 16 : INDIA.zoom;
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black zoom-punch">
