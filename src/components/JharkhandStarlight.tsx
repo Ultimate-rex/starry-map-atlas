@@ -209,9 +209,9 @@ export function JharkhandStarlight({ onClose, target }: Props) {
   return (
     <div className="fixed inset-0 z-50 bg-black zoom-punch">
       <SatelliteCanvas
-        lat={focus.lat}
-        lon={focus.lon}
-        zoom={zoom}
+        lat={lock.lat}
+        lon={lock.lon}
+        zoom={lock.zoom}
         markers={markers}
         className="h-full w-full"
       />
