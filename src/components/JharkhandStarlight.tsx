@@ -69,7 +69,11 @@ export function JharkhandStarlight({ onClose, target }: Props) {
   const runTrace = useCallback(async () => {
     setTrace("tracing");
     setErr(null);
-    push("> initialising radar sweep…");
+    push(
+      target
+        ? `> target locked ${target.lat.toFixed(3)}, ${target.lon.toFixed(3)} — refining…`
+        : "> initialising radar sweep…",
+    );
     try {
       const [ipRes, fixRes] = await Promise.allSettled([getIpInfo(), getBrowserFix()]);
       if (ipRes.status === "fulfilled") {
@@ -90,8 +94,16 @@ export function JharkhandStarlight({ onClose, target }: Props) {
               } satisfies Fix)
             : null;
       if (!f) throw new Error("No location signal available");
+      const far =
+        !!target &&
+        Math.hypot(f.lat - target.lat, f.lon - target.lon) > REFINE_RADIUS;
+      setOutside(far);
       setFix(f);
-      push(`> lock ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} ±${Math.round(f.accuracy)}m`);
+      push(
+        far
+          ? "> live fix outside targeted region — holding target lock"
+          : `> lock ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} ±${Math.round(f.accuracy)}m`,
+      );
       const [p, img] = await Promise.allSettled([
         reverseGeocode(f.lat, f.lon),
         nearestStreetImage(f.lat, f.lon),
@@ -108,7 +120,8 @@ export function JharkhandStarlight({ onClose, target }: Props) {
       setTrace("error");
       push("> trace failed");
     }
-  }, [push, speak]);
+  }, [push, speak, target]);
+
 
   /* voice command channel */
   const recRef = useRef<{ start: () => void; stop: () => void } | null>(null);
