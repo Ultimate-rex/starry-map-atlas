@@ -570,7 +570,10 @@ export function WorldMap() {
         </button>
       </div>
 
-      {starlight && <JharkhandStarlight onClose={() => setStarlight(false)} />}
+      {starlight && (
+        <JharkhandStarlight target={starlight} onClose={() => setStarlight(null)} />
+      )}
+
 
       {/* Counter */}
       <div className="pointer-events-none absolute left-5 top-5 text-xs tracking-[0.35em] uppercase text-muted-foreground">
