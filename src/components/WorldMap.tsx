@@ -407,7 +407,7 @@ export function WorldMap() {
           {/* Jharkhand district borders, drawn whenever India is on screen */}
           {(focusName === "India" ||
             (showStates && stop.worldName === "India")) && (
-            <g key="jh-districts" onClick={() => setStarlight(true)} className="cursor-pointer">
+            <g key="jh-districts" onClick={lockRadarAt} className="cursor-pointer">
               {jhPaths.map((s, i) => (
                 <path
                   key={`jh-${s.name ?? i}`}
