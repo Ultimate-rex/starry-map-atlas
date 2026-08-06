@@ -67,7 +67,10 @@ export function WorldMap() {
   const [phase, setPhase] = useState<Phase>("fly");
   const [playing, setPlaying] = useState(true);
   const [focusName, setFocusName] = useState<string | null>(null);
-  const [starlight, setStarlight] = useState(false);
+  const [starlight, setStarlight] = useState<{ lat: number; lon: number } | null>(
+    null,
+  );
+
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
