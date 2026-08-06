@@ -252,6 +252,24 @@ export function JharkhandStarlight({ onClose }: Props) {
           />
         )}
 
+        {stills.length > 0 && (
+          <div className="trace-in grid grid-cols-4 gap-1">
+            {stills.map((s) => (
+              <figure key={s.z} className="relative overflow-hidden rounded border border-white/15">
+                <img
+                  src={s.url}
+                  alt={`Satellite view of your location at ${s.label} scale`}
+                  className="h-16 w-full object-cover"
+                />
+                <figcaption className="mono-hud absolute inset-x-0 bottom-0 bg-black/70 text-center text-[8px] uppercase tracking-[0.2em] text-emerald-300">
+                  {s.label}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
+
+
         <div className="mono-hud trace-in rounded-md border border-white/15 bg-black/80 p-3 text-[11px] backdrop-blur">
           <div className="mb-2 text-[10px] uppercase tracking-[0.3em] text-emerald-300">
             Live telemetry
