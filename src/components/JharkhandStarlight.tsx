@@ -200,6 +200,8 @@ export function JharkhandStarlight({ onClose }: Props) {
       <div className="pointer-events-none absolute left-5 top-5">
         <div className="mono-hud text-[10px] uppercase tracking-[0.35em] text-emerald-300">
           India · orbital feed {fix ? "· lock acquired" : "· acquiring you"}
+        </div>
+
 
         <div className="type-reveal mono-hud mt-1 text-[10px] tracking-[0.2em] text-white/60">
           {clock} · esri world imagery
