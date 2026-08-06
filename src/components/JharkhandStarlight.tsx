@@ -11,15 +11,22 @@ import {
   type PlaceInfo,
 } from "@/lib/geoTrace";
 
-/** Whole-India frame: the trace always starts from the national view. */
+/** Whole-India frame: the fallback frame when no region was targeted. */
 const INDIA = { lat: 22.6, lon: 79.4, zoom: 4.2 };
 
-type Props = { onClose: () => void };
+/** How far (degrees) a live fix may sit from the targeted region and still refine it. */
+const REFINE_RADIUS = 2.5;
+
+type Props = {
+  onClose: () => void;
+  /** Region clicked on the India map — the radar locks here first. */
+  target?: { lat: number; lon: number } | undefined;
+};
 
 type TraceState = "idle" | "tracing" | "done" | "error";
 
-/** Full-screen satellite / radar console: India view → live current-location lock. */
-export function JharkhandStarlight({ onClose }: Props) {
+/** Full-screen satellite / radar console: targeted region lock → live trace refinement. */
+export function JharkhandStarlight({ onClose, target }: Props) {
   const [trace, setTrace] = useState<TraceState>("idle");
   const [fix, setFix] = useState<Fix | null>(null);
   const [place, setPlace] = useState<PlaceInfo | null>(null);
