@@ -316,6 +316,22 @@ export function JharkhandStarlight({ onClose, target }: Props) {
             Live telemetry
           </div>
           {err && <div className="mb-2 text-destructive">{err}</div>}
+          {outside && (
+            <div className="mb-2 text-amber-300">
+              Live fix is outside the targeted region — radar stays on the target.
+            </div>
+          )}
+          <Row
+            k="Target"
+            v={
+              target
+                ? (region?.district ??
+                  region?.city ??
+                  `${target.lat.toFixed(3)}, ${target.lon.toFixed(3)}`)
+                : "—"
+            }
+          />
+
           <Row k="IP" v={ip?.ip ?? "—"} />
           <Row k="Network" v={ip?.org ?? "—"} />
           <Row
