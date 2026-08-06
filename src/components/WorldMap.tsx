@@ -245,6 +245,25 @@ export function WorldMap() {
     [focusName, flyTo, targetFor],
   );
 
+  /** Convert a click on the map into geographic coordinates and lock the radar there. */
+  const lockRadarAt = useCallback(
+    (e: React.MouseEvent<SVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const sx = ((e.clientX - rect.left) / rect.width) * size.width;
+      const sy = ((e.clientY - rect.top) / rect.height) * size.height;
+      const gx = (sx - transform.x) / transform.k;
+      const gy = (sy - transform.y) / transform.k;
+      const inv = projection.invert?.([gx, gy]);
+      if (!inv) return;
+      setStarlight({ lon: inv[0], lat: inv[1] });
+    },
+    [projection, size.height, size.width, transform.k, transform.x, transform.y],
+  );
+
+
+
   /* ---------------- state (admin-1) borders for current stop ---------------- */
   const statePaths = useMemo(() => {
     const fc = ADMIN1[stop.admin1Key];
