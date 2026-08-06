@@ -5,19 +5,20 @@ import {
   getIpInfo,
   nearestStreetImage,
   reverseGeocode,
+  satelliteStills,
   type Fix,
   type IpInfo,
   type PlaceInfo,
 } from "@/lib/geoTrace";
 
-/** Geographic centre of Jharkhand. */
-const JH = { lat: 23.61, lon: 85.28, zoom: 7.4 };
+/** Whole-India frame: the trace always starts from the national view. */
+const INDIA = { lat: 22.6, lon: 79.4, zoom: 4.2 };
 
 type Props = { onClose: () => void };
 
 type TraceState = "idle" | "tracing" | "done" | "error";
 
-/** Full-screen satellite / radar console for Jharkhand with live location trace. */
+/** Full-screen satellite / radar console: India view → live current-location lock. */
 export function JharkhandStarlight({ onClose }: Props) {
   const [trace, setTrace] = useState<TraceState>("idle");
   const [fix, setFix] = useState<Fix | null>(null);
@@ -30,6 +31,7 @@ export function JharkhandStarlight({ onClose }: Props) {
   const [voiceOn, setVoiceOn] = useState(false);
   const [heard, setHeard] = useState("");
   const [clock, setClock] = useState("");
+
 
   const push = useCallback(
     (line: string) => setLog((l) => [...l.slice(-7), line]),
