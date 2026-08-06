@@ -172,26 +172,38 @@ export function JharkhandStarlight({ onClose, target }: Props) {
     setVoiceOn(true);
   }, [listening, onClose, push, runTrace, speak]);
 
-  /* the console opens on the India frame and immediately asks for the live fix */
+  /* lock the radar on the clicked region first, then refine with the live fix */
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void runTrace();
-  }, [runTrace]);
+    if (target) {
+      push(`> region acquired ${target.lat.toFixed(3)}, ${target.lon.toFixed(3)}`);
+      void reverseGeocode(target.lat, target.lon)
+        .then(setRegion)
+        .catch(() => undefined);
+    }
+    const t = setTimeout(() => void runTrace(), target ? 1200 : 0);
+    return () => clearTimeout(t);
+  }, [push, runTrace, target]);
 
-  const markers = useMemo<Marker[]>(
-    () => (fix ? [{ lat: fix.lat, lon: fix.lon, kind: "you", radar: true }] : []),
-    [fix],
-  );
+  /** where the radar sits: targeted region, refined by the live fix when it matches */
+  const lock = useMemo(() => {
+    if (fix && !outside) return { lat: fix.lat, lon: fix.lon, zoom: 16 };
+    if (target) return { lat: target.lat, lon: target.lon, zoom: 10 };
+    if (fix) return { lat: fix.lat, lon: fix.lon, zoom: 16 };
+    return { lat: INDIA.lat, lon: INDIA.lon, zoom: INDIA.zoom };
+  }, [fix, outside, target]);
 
-  const stills = useMemo(
-    () => (fix ? satelliteStills(fix.lat, fix.lon) : []),
-    [fix],
-  );
+  const markers = useMemo<Marker[]>(() => {
+    const m: Marker[] = [];
+    if (target) m.push({ lat: target.lat, lon: target.lon, kind: "target", radar: true });
+    if (fix) m.push({ lat: fix.lat, lon: fix.lon, kind: "you", radar: true });
+    return m;
+  }, [fix, target]);
 
-  const focus = fix ?? INDIA;
-  const zoom = fix ? 16 : INDIA.zoom;
+  const stills = useMemo(() => satelliteStills(lock.lat, lock.lon), [lock]);
+
 
 
   return (
