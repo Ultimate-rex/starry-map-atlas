@@ -368,7 +368,13 @@ export function WorldMap() {
                 strokeWidth={(focused ? 1.6 : active ? 1.3 : 0.75) / transform.k}
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                onClick={() => name && handleCountryClick(name)}
+                onClick={(e) => {
+                  if (!name) return;
+                  // India already focused: a click targets the radar at that spot
+                  if (name === "India" && focusName === "India") lockRadarAt(e);
+                  else handleCountryClick(name);
+                }}
+
                 style={
                   focused
                     ? { filter: `drop-shadow(0 0 4px ${GREEN_GLOW})` }
