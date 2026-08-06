@@ -11,15 +11,22 @@ import {
   type PlaceInfo,
 } from "@/lib/geoTrace";
 
-/** Whole-India frame: the trace always starts from the national view. */
+/** Whole-India frame: the fallback frame when no region was targeted. */
 const INDIA = { lat: 22.6, lon: 79.4, zoom: 4.2 };
 
-type Props = { onClose: () => void };
+/** How far (degrees) a live fix may sit from the targeted region and still refine it. */
+const REFINE_RADIUS = 2.5;
+
+type Props = {
+  onClose: () => void;
+  /** Region clicked on the India map — the radar locks here first. */
+  target?: { lat: number; lon: number } | undefined;
+};
 
 type TraceState = "idle" | "tracing" | "done" | "error";
 
-/** Full-screen satellite / radar console: India view → live current-location lock. */
-export function JharkhandStarlight({ onClose }: Props) {
+/** Full-screen satellite / radar console: targeted region lock → live trace refinement. */
+export function JharkhandStarlight({ onClose, target }: Props) {
   const [trace, setTrace] = useState<TraceState>("idle");
   const [fix, setFix] = useState<Fix | null>(null);
   const [place, setPlace] = useState<PlaceInfo | null>(null);
@@ -31,6 +38,9 @@ export function JharkhandStarlight({ onClose }: Props) {
   const [voiceOn, setVoiceOn] = useState(false);
   const [heard, setHeard] = useState("");
   const [clock, setClock] = useState("");
+  const [region, setRegion] = useState<PlaceInfo | null>(null);
+  const [outside, setOutside] = useState(false);
+
 
 
   const push = useCallback(
@@ -59,7 +69,11 @@ export function JharkhandStarlight({ onClose }: Props) {
   const runTrace = useCallback(async () => {
     setTrace("tracing");
     setErr(null);
-    push("> initialising radar sweep…");
+    push(
+      target
+        ? `> target locked ${target.lat.toFixed(3)}, ${target.lon.toFixed(3)} — refining…`
+        : "> initialising radar sweep…",
+    );
     try {
       const [ipRes, fixRes] = await Promise.allSettled([getIpInfo(), getBrowserFix()]);
       if (ipRes.status === "fulfilled") {
@@ -80,8 +94,16 @@ export function JharkhandStarlight({ onClose }: Props) {
               } satisfies Fix)
             : null;
       if (!f) throw new Error("No location signal available");
+      const far =
+        !!target &&
+        Math.hypot(f.lat - target.lat, f.lon - target.lon) > REFINE_RADIUS;
+      setOutside(far);
       setFix(f);
-      push(`> lock ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} ±${Math.round(f.accuracy)}m`);
+      push(
+        far
+          ? "> live fix outside targeted region — holding target lock"
+          : `> lock ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} ±${Math.round(f.accuracy)}m`,
+      );
       const [p, img] = await Promise.allSettled([
         reverseGeocode(f.lat, f.lon),
         nearestStreetImage(f.lat, f.lon),
@@ -98,7 +120,8 @@ export function JharkhandStarlight({ onClose }: Props) {
       setTrace("error");
       push("> trace failed");
     }
-  }, [push, speak]);
+  }, [push, speak, target]);
+
 
   /* voice command channel */
   const recRef = useRef<{ start: () => void; stop: () => void } | null>(null);
@@ -149,34 +172,46 @@ export function JharkhandStarlight({ onClose }: Props) {
     setVoiceOn(true);
   }, [listening, onClose, push, runTrace, speak]);
 
-  /* the console opens on the India frame and immediately asks for the live fix */
+  /* lock the radar on the clicked region first, then refine with the live fix */
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void runTrace();
-  }, [runTrace]);
+    if (target) {
+      push(`> region acquired ${target.lat.toFixed(3)}, ${target.lon.toFixed(3)}`);
+      void reverseGeocode(target.lat, target.lon)
+        .then(setRegion)
+        .catch(() => undefined);
+    }
+    const t = setTimeout(() => void runTrace(), target ? 1200 : 0);
+    return () => clearTimeout(t);
+  }, [push, runTrace, target]);
 
-  const markers = useMemo<Marker[]>(
-    () => (fix ? [{ lat: fix.lat, lon: fix.lon, kind: "you", radar: true }] : []),
-    [fix],
-  );
+  /** where the radar sits: targeted region, refined by the live fix when it matches */
+  const lock = useMemo(() => {
+    if (fix && !outside) return { lat: fix.lat, lon: fix.lon, zoom: 16 };
+    if (target) return { lat: target.lat, lon: target.lon, zoom: 10 };
+    if (fix) return { lat: fix.lat, lon: fix.lon, zoom: 16 };
+    return { lat: INDIA.lat, lon: INDIA.lon, zoom: INDIA.zoom };
+  }, [fix, outside, target]);
 
-  const stills = useMemo(
-    () => (fix ? satelliteStills(fix.lat, fix.lon) : []),
-    [fix],
-  );
+  const markers = useMemo<Marker[]>(() => {
+    const m: Marker[] = [];
+    if (target) m.push({ lat: target.lat, lon: target.lon, kind: "target", radar: true });
+    if (fix) m.push({ lat: fix.lat, lon: fix.lon, kind: "you", radar: true });
+    return m;
+  }, [fix, target]);
 
-  const focus = fix ?? INDIA;
-  const zoom = fix ? 16 : INDIA.zoom;
+  const stills = useMemo(() => satelliteStills(lock.lat, lock.lon), [lock]);
+
 
 
   return (
     <div className="fixed inset-0 z-50 bg-black zoom-punch">
       <SatelliteCanvas
-        lat={focus.lat}
-        lon={focus.lon}
-        zoom={zoom}
+        lat={lock.lat}
+        lon={lock.lon}
+        zoom={lock.zoom}
         markers={markers}
         className="h-full w-full"
       />
@@ -199,8 +234,14 @@ export function JharkhandStarlight({ onClose }: Props) {
       {/* header */}
       <div className="pointer-events-none absolute left-5 top-5">
         <div className="mono-hud text-[10px] uppercase tracking-[0.35em] text-emerald-300">
-          India · orbital feed {fix ? "· lock acquired" : "· acquiring you"}
+          {region?.district ?? region?.state ?? "India"} · orbital feed{" "}
+          {fix && !outside
+            ? "· refined lock"
+            : fix
+              ? "· target lock held"
+              : "· target locked"}
         </div>
+
 
 
         <div className="type-reveal mono-hud mt-1 text-[10px] tracking-[0.2em] text-white/60">
@@ -275,6 +316,22 @@ export function JharkhandStarlight({ onClose }: Props) {
             Live telemetry
           </div>
           {err && <div className="mb-2 text-destructive">{err}</div>}
+          {outside && (
+            <div className="mb-2 text-amber-300">
+              Live fix is outside the targeted region — radar stays on the target.
+            </div>
+          )}
+          <Row
+            k="Target"
+            v={
+              target
+                ? (region?.district ??
+                  region?.city ??
+                  `${target.lat.toFixed(3)}, ${target.lon.toFixed(3)}`)
+                : "—"
+            }
+          />
+
           <Row k="IP" v={ip?.ip ?? "—"} />
           <Row k="Network" v={ip?.org ?? "—"} />
           <Row

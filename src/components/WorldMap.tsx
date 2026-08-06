@@ -67,7 +67,10 @@ export function WorldMap() {
   const [phase, setPhase] = useState<Phase>("fly");
   const [playing, setPlaying] = useState(true);
   const [focusName, setFocusName] = useState<string | null>(null);
-  const [starlight, setStarlight] = useState(false);
+  const [starlight, setStarlight] = useState<{ lat: number; lon: number } | null>(
+    null,
+  );
+
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -242,6 +245,25 @@ export function WorldMap() {
     [focusName, flyTo, targetFor],
   );
 
+  /** Convert a click on the map into geographic coordinates and lock the radar there. */
+  const lockRadarAt = useCallback(
+    (e: React.MouseEvent<SVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const sx = ((e.clientX - rect.left) / rect.width) * size.width;
+      const sy = ((e.clientY - rect.top) / rect.height) * size.height;
+      const gx = (sx - transform.x) / transform.k;
+      const gy = (sy - transform.y) / transform.k;
+      const inv = projection.invert?.([gx, gy]);
+      if (!inv) return;
+      setStarlight({ lon: inv[0], lat: inv[1] });
+    },
+    [projection, size.height, size.width, transform.k, transform.x, transform.y],
+  );
+
+
+
   /* ---------------- state (admin-1) borders for current stop ---------------- */
   const statePaths = useMemo(() => {
     const fc = ADMIN1[stop.admin1Key];
@@ -346,7 +368,13 @@ export function WorldMap() {
                 strokeWidth={(focused ? 1.6 : active ? 1.3 : 0.75) / transform.k}
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                onClick={() => name && handleCountryClick(name)}
+                onClick={(e) => {
+                  if (!name) return;
+                  // India already focused: a click targets the radar at that spot
+                  if (name === "India" && focusName === "India") lockRadarAt(e);
+                  else handleCountryClick(name);
+                }}
+
                 style={
                   focused
                     ? { filter: `drop-shadow(0 0 4px ${GREEN_GLOW})` }
@@ -379,7 +407,7 @@ export function WorldMap() {
           {/* Jharkhand district borders, drawn whenever India is on screen */}
           {(focusName === "India" ||
             (showStates && stop.worldName === "India")) && (
-            <g key="jh-districts" onClick={() => setStarlight(true)} className="cursor-pointer">
+            <g key="jh-districts" onClick={lockRadarAt} className="cursor-pointer">
               {jhPaths.map((s, i) => (
                 <path
                   key={`jh-${s.name ?? i}`}
@@ -542,7 +570,10 @@ export function WorldMap() {
         </button>
       </div>
 
-      {starlight && <JharkhandStarlight onClose={() => setStarlight(false)} />}
+      {starlight && (
+        <JharkhandStarlight target={starlight} onClose={() => setStarlight(null)} />
+      )}
+
 
       {/* Counter */}
       <div className="pointer-events-none absolute left-5 top-5 text-xs tracking-[0.35em] uppercase text-muted-foreground">
