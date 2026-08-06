@@ -234,8 +234,14 @@ export function JharkhandStarlight({ onClose, target }: Props) {
       {/* header */}
       <div className="pointer-events-none absolute left-5 top-5">
         <div className="mono-hud text-[10px] uppercase tracking-[0.35em] text-emerald-300">
-          India · orbital feed {fix ? "· lock acquired" : "· acquiring you"}
+          {region?.district ?? region?.state ?? "India"} · orbital feed{" "}
+          {fix && !outside
+            ? "· refined lock"
+            : fix
+              ? "· target lock held"
+              : "· target locked"}
         </div>
+
 
 
         <div className="type-reveal mono-hud mt-1 text-[10px] tracking-[0.2em] text-white/60">
