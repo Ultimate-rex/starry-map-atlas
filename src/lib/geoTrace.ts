@@ -91,6 +91,28 @@ export async function reverseGeocode(lat: number, lon: number): Promise<PlaceInf
   };
 }
 
+/** A few satellite stills of the same point at different altitudes. */
+export function satelliteStills(
+  lat: number,
+  lon: number,
+): { z: number; label: string; url: string }[] {
+  const tile = (z: number) => {
+    const n = 2 ** z;
+    const x = Math.floor(((lon + 180) / 360) * n);
+    const r = (lat * Math.PI) / 180;
+    const y = Math.floor(
+      ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n,
+    );
+    return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+  };
+  return [
+    { z: 18, label: "rooftop", url: tile(18) },
+    { z: 15, label: "block", url: tile(15) },
+    { z: 12, label: "city", url: tile(12) },
+    { z: 9, label: "region", url: tile(9) },
+  ];
+}
+
 /** Nearest street-level photo (Mapillary open imagery), if any. */
 export async function nearestStreetImage(
   lat: number,

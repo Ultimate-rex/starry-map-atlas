@@ -112,29 +112,92 @@ export function SatelliteCanvas({
     return () => el.removeEventListener("wheel", handler);
   }, []);
 
+  /* two-finger pinch zoom + one-finger drag */
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinch = useRef<{ dist: number; z: number } | null>(null);
+
+  const zoomAt = useCallback(
+    (px: number, py: number, next: number) => {
+      const v = viewRef.current;
+      const zi = v.z;
+      const ax = lon2px(v.lon, zi) + (px - size.w / 2);
+      const ay = lat2px(v.lat, zi) + (py - size.h / 2);
+      const nax = lon2px(px2lon(ax, zi), next);
+      const nay = lat2px(px2lat(ay, zi), next);
+      setView({
+        z: next,
+        lon: px2lon(nax - (px - size.w / 2), next),
+        lat: clamp(px2lat(nay - (py - size.h / 2), next), -85, 85),
+      });
+    },
+    [size.w, size.h],
+  );
+
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY };
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()];
+      pinch.current = {
+        dist: Math.hypot(a!.x - b!.x, a!.y - b!.y),
+        z: viewRef.current.z,
+      };
+      drag.current = null;
+    } else {
+      drag.current = { x: e.clientX, y: e.clientY };
+    }
     setGrabbing(true);
   }, []);
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    drag.current = { x: e.clientX, y: e.clientY };
-    setView((v) => {
-      const cx = lon2px(v.lon, v.z) - dx;
-      const cy = lat2px(v.lat, v.z) - dy;
-      return { z: v.z, lon: px2lon(cx, v.z), lat: clamp(px2lat(cy, v.z), -85, 85) };
-    });
-  }, []);
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (pointers.current.has(e.pointerId))
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  const endDrag = useCallback(() => {
+      if (pointers.current.size >= 2 && pinch.current) {
+        const [a, b] = [...pointers.current.values()];
+        const dist = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+        if (dist > 0 && pinch.current.dist > 0) {
+          const next = clamp(
+            pinch.current.z + Math.log2(dist / pinch.current.dist),
+            minZoom,
+            maxZoom,
+          );
+          const el = ref.current;
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            zoomAt(
+              (a!.x + b!.x) / 2 - rect.left,
+              (a!.y + b!.y) / 2 - rect.top,
+              next,
+            );
+          }
+        }
+        return;
+      }
+
+      const d = drag.current;
+      if (!d) return;
+      const dx = e.clientX - d.x;
+      const dy = e.clientY - d.y;
+      drag.current = { x: e.clientX, y: e.clientY };
+      setView((v) => {
+        const cx = lon2px(v.lon, v.z) - dx;
+        const cy = lat2px(v.lat, v.z) - dy;
+        return { z: v.z, lon: px2lon(cx, v.z), lat: clamp(px2lat(cy, v.z), -85, 85) };
+      });
+    },
+    [maxZoom, minZoom, zoomAt],
+  );
+
+  const endDrag = useCallback((e?: React.PointerEvent) => {
+    if (e) pointers.current.delete(e.pointerId);
+    else pointers.current.clear();
+    if (pointers.current.size < 2) pinch.current = null;
     drag.current = null;
     setGrabbing(false);
   }, []);
+
 
   /* ---- tiles ---- */
   const zi = Math.max(0, Math.min(19, Math.round(view.z)));

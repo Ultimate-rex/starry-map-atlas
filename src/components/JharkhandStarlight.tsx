@@ -5,19 +5,20 @@ import {
   getIpInfo,
   nearestStreetImage,
   reverseGeocode,
+  satelliteStills,
   type Fix,
   type IpInfo,
   type PlaceInfo,
 } from "@/lib/geoTrace";
 
-/** Geographic centre of Jharkhand. */
-const JH = { lat: 23.61, lon: 85.28, zoom: 7.4 };
+/** Whole-India frame: the trace always starts from the national view. */
+const INDIA = { lat: 22.6, lon: 79.4, zoom: 4.2 };
 
 type Props = { onClose: () => void };
 
 type TraceState = "idle" | "tracing" | "done" | "error";
 
-/** Full-screen satellite / radar console for Jharkhand with live location trace. */
+/** Full-screen satellite / radar console: India view → live current-location lock. */
 export function JharkhandStarlight({ onClose }: Props) {
   const [trace, setTrace] = useState<TraceState>("idle");
   const [fix, setFix] = useState<Fix | null>(null);
@@ -30,6 +31,7 @@ export function JharkhandStarlight({ onClose }: Props) {
   const [voiceOn, setVoiceOn] = useState(false);
   const [heard, setHeard] = useState("");
   const [clock, setClock] = useState("");
+
 
   const push = useCallback(
     (line: string) => setLog((l) => [...l.slice(-7), line]),
@@ -147,14 +149,27 @@ export function JharkhandStarlight({ onClose }: Props) {
     setVoiceOn(true);
   }, [listening, onClose, push, runTrace, speak]);
 
-  const markers = useMemo<Marker[]>(() => {
-    const m: Marker[] = [{ lat: JH.lat, lon: JH.lon, kind: "target", radar: true }];
-    if (fix) m.push({ lat: fix.lat, lon: fix.lon, kind: "you", radar: true });
-    return m;
-  }, [fix]);
+  /* the console opens on the India frame and immediately asks for the live fix */
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void runTrace();
+  }, [runTrace]);
 
-  const focus = fix ?? JH;
-  const zoom = fix ? 13 : JH.zoom;
+  const markers = useMemo<Marker[]>(
+    () => (fix ? [{ lat: fix.lat, lon: fix.lon, kind: "you", radar: true }] : []),
+    [fix],
+  );
+
+  const stills = useMemo(
+    () => (fix ? satelliteStills(fix.lat, fix.lon) : []),
+    [fix],
+  );
+
+  const focus = fix ?? INDIA;
+  const zoom = fix ? 16 : INDIA.zoom;
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black zoom-punch">
@@ -184,8 +199,10 @@ export function JharkhandStarlight({ onClose }: Props) {
       {/* header */}
       <div className="pointer-events-none absolute left-5 top-5">
         <div className="mono-hud text-[10px] uppercase tracking-[0.35em] text-emerald-300">
-          Jharkhand · orbital feed
+          India · orbital feed {fix ? "· lock acquired" : "· acquiring you"}
         </div>
+
+
         <div className="type-reveal mono-hud mt-1 text-[10px] tracking-[0.2em] text-white/60">
           {clock} · esri world imagery
         </div>
@@ -234,6 +251,24 @@ export function JharkhandStarlight({ onClose }: Props) {
             className="trace-in h-36 w-full rounded-md border border-white/15 object-cover"
           />
         )}
+
+        {stills.length > 0 && (
+          <div className="trace-in grid grid-cols-4 gap-1">
+            {stills.map((s) => (
+              <figure key={s.z} className="relative overflow-hidden rounded border border-white/15">
+                <img
+                  src={s.url}
+                  alt={`Satellite view of your location at ${s.label} scale`}
+                  className="h-16 w-full object-cover"
+                />
+                <figcaption className="mono-hud absolute inset-x-0 bottom-0 bg-black/70 text-center text-[8px] uppercase tracking-[0.2em] text-emerald-300">
+                  {s.label}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
+
 
         <div className="mono-hud trace-in rounded-md border border-white/15 bg-black/80 p-3 text-[11px] backdrop-blur">
           <div className="mb-2 text-[10px] uppercase tracking-[0.3em] text-emerald-300">
