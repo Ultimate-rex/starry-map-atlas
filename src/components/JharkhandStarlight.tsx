@@ -1,6 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { SatelliteCanvas, type Marker } from "@/components/SatelliteCanvas";
-import { getBrowserFix, getIpInfo, type Fix } from "@/lib/geoTrace";
+import {
+  getBrowserFix,
+  getIpInfo,
+  reverseGeocode,
+  type Fix,
+  type IpInfo,
+  type PlaceInfo,
+} from "@/lib/geoTrace";
+
 
 /** Whole-India frame: where the console always opens. */
 const INDIA = { lat: 22.6, lon: 79.4, zoom: 4.4 };
