@@ -179,3 +179,12 @@ export function JharkhandStarlight({ onClose }: Props) {
     </div>
   );
 }
+
+function D({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-3 py-0.5">
+      <span className="text-emerald-300/70">{k}</span>
+      <span className="truncate text-right">{v}</span>
+    </div>
+  );
+}
