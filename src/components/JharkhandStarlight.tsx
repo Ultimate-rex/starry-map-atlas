@@ -24,11 +24,15 @@ type TraceState = "idle" | "tracing" | "done" | "error";
 export function JharkhandStarlight({ onClose }: Props) {
   const [trace, setTrace] = useState<TraceState>("idle");
   const [fix, setFix] = useState<Fix | null>(null);
+  const [ip, setIp] = useState<IpInfo | null>(null);
+  const [place, setPlace] = useState<PlaceInfo | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const runTrace = useCallback(async () => {
     setTrace("tracing");
     try {
       const [ipRes, fixRes] = await Promise.allSettled([getIpInfo(), getBrowserFix()]);
+      if (ipRes.status === "fulfilled") setIp(ipRes.value);
       const f =
         fixRes.status === "fulfilled"
           ? fixRes.value
@@ -47,10 +51,14 @@ export function JharkhandStarlight({ onClose }: Props) {
       await new Promise((r) => setTimeout(r, 1400));
       setFix(f);
       setTrace("done");
+      void reverseGeocode(f.lat, f.lon)
+        .then(setPlace)
+        .catch(() => undefined);
     } catch {
       setTrace("error");
     }
   }, []);
+
 
   const lock = useMemo(
     () => (fix ? { lat: fix.lat, lon: fix.lon, zoom: 17 } : INDIA),
