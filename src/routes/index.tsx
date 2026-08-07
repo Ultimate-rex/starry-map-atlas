@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { WorldMap } from "@/components/WorldMap";
 
 export const Route = createFileRoute("/")({
