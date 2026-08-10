@@ -131,14 +131,8 @@ export function WorldMap() {
     [countries],
   );
 
-  /** Jharkhand district borders, drawn when India is the active country. */
-  const jhPaths = useMemo(
-    () =>
-      JH.features
-        .map((f) => ({ d: path(f) ?? "", name: f.properties?.name ?? null }))
-        .filter((s) => s.d.length > 0),
-    [path],
-  );
+
+
 
 
   /* ---------------- zoom behaviour ---------------- */
