@@ -8,7 +8,6 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
 import admin1 from "@/data/admin1-top20.json";
 import indiaOutline from "@/data/india-outline.json";
-import jhDistricts from "@/data/jharkhand-districts.json";
 import { TOUR } from "@/data/tour";
 import { computeMetrics } from "@/lib/geoMetrics";
 import { MeasureLayer } from "@/components/MeasureLayer";
@@ -27,7 +26,6 @@ const ADMIN1 = admin1 as unknown as Record<
 /** Official India national outline (includes J&K and Ladakh in full). */
 const INDIA = indiaOutline as unknown as Feature<Geometry, CountryProps>;
 
-const JH = jhDistricts as unknown as FeatureCollection<Geometry, StateProps>;
 
 /** world-atlas name -> admin1-top20 key */
 const ADMIN1_ALIAS: Record<string, string> = {
@@ -131,14 +129,8 @@ export function WorldMap() {
     [countries],
   );
 
-  /** Jharkhand district borders, drawn when India is the active country. */
-  const jhPaths = useMemo(
-    () =>
-      JH.features
-        .map((f) => ({ d: path(f) ?? "", name: f.properties?.name ?? null }))
-        .filter((s) => s.d.length > 0),
-    [path],
-  );
+
+
 
 
   /* ---------------- zoom behaviour ---------------- */
@@ -404,27 +396,7 @@ export function WorldMap() {
             </g>
           )}
 
-          {/* Jharkhand district borders, drawn whenever India is on screen */}
-          {(focusName === "India" ||
-            (showStates && stop.worldName === "India")) && (
-            <g key="jh-districts" onClick={lockRadarAt} className="cursor-pointer">
-              {jhPaths.map((s, i) => (
-                <path
-                  key={`jh-${s.name ?? i}`}
-                  d={s.d}
-                  className="state-path state-path-focus"
-                  pathLength={1}
-                  strokeDasharray={1}
-                  strokeWidth={0.5 / transform.k}
-                  fill="rgba(52,211,153,0.05)"
-                  style={{
-                    animationDelay: `${600 + i * 40}ms`,
-                    filter: `drop-shadow(0 0 2px ${GREEN_GLOW})`,
-                  }}
-                />
-              ))}
-            </g>
-          )}
+
 
 
 
