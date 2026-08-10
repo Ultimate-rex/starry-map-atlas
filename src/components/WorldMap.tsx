@@ -404,27 +404,7 @@ export function WorldMap() {
             </g>
           )}
 
-          {/* Jharkhand district borders, drawn whenever India is on screen */}
-          {(focusName === "India" ||
-            (showStates && stop.worldName === "India")) && (
-            <g key="jh-districts" onClick={lockRadarAt} className="cursor-pointer">
-              {jhPaths.map((s, i) => (
-                <path
-                  key={`jh-${s.name ?? i}`}
-                  d={s.d}
-                  className="state-path state-path-focus"
-                  pathLength={1}
-                  strokeDasharray={1}
-                  strokeWidth={0.5 / transform.k}
-                  fill="rgba(52,211,153,0.05)"
-                  style={{
-                    animationDelay: `${600 + i * 40}ms`,
-                    filter: `drop-shadow(0 0 2px ${GREEN_GLOW})`,
-                  }}
-                />
-              ))}
-            </g>
-          )}
+
 
 
 
