@@ -8,7 +8,6 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import worldData from "world-atlas/countries-110m.json";
 import admin1 from "@/data/admin1-top20.json";
 import indiaOutline from "@/data/india-outline.json";
-import jhDistricts from "@/data/jharkhand-districts.json";
 import { TOUR } from "@/data/tour";
 import { computeMetrics } from "@/lib/geoMetrics";
 import { MeasureLayer } from "@/components/MeasureLayer";
@@ -27,7 +26,6 @@ const ADMIN1 = admin1 as unknown as Record<
 /** Official India national outline (includes J&K and Ladakh in full). */
 const INDIA = indiaOutline as unknown as Feature<Geometry, CountryProps>;
 
-const JH = jhDistricts as unknown as FeatureCollection<Geometry, StateProps>;
 
 /** world-atlas name -> admin1-top20 key */
 const ADMIN1_ALIAS: Record<string, string> = {
