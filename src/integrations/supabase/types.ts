@@ -14,13 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      location_traces: {
+        Row: {
+          accuracy_m: number | null
+          city: string | null
+          consented_at: string
+          country: string | null
+          created_at: string
+          device_info: Json
+          id: string
+          ip_address: unknown
+          latitude: number
+          longitude: number
+          organization: string | null
+          region: string | null
+          source: string
+          timezone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy_m?: number | null
+          city?: string | null
+          consented_at?: string
+          country?: string | null
+          created_at?: string
+          device_info?: Json
+          id?: string
+          ip_address?: unknown
+          latitude: number
+          longitude: number
+          organization?: string | null
+          region?: string | null
+          source: string
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy_m?: number | null
+          city?: string | null
+          consented_at?: string
+          country?: string | null
+          created_at?: string
+          device_info?: Json
+          id?: string
+          ip_address?: unknown
+          latitude?: number
+          longitude?: number
+          organization?: string | null
+          region?: string | null
+          source?: string
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
