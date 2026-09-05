@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 const TILE = 256;
 
@@ -19,6 +19,12 @@ type Props = {
   className?: string;
   /** draw place-name labels over the imagery */
   labels?: boolean;
+  renderOverlay?: (args: {
+    width: number;
+    height: number;
+    zoom: number;
+    center: { lat: number; lon: number };
+  }) => ReactNode;
 };
 
 const IMAGERY = (z: number, x: number, y: number) =>
@@ -51,6 +57,7 @@ export function SatelliteCanvas({
   markers = [],
   className = "",
   labels = false,
+  renderOverlay,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 520 });
@@ -295,6 +302,8 @@ export function SatelliteCanvas({
           );
         })}
       </svg>
+
+      {renderOverlay?.({ width: size.w, height: size.h, zoom: view.z, center: { lat: view.lat, lon: view.lon } })}
 
       <div className="mono-hud pointer-events-none absolute bottom-2 left-3 text-[9px] tracking-[0.2em] text-emerald-300/80">
         Z{view.z.toFixed(1)} · {view.lat.toFixed(4)}, {view.lon.toFixed(4)} · DRAG /

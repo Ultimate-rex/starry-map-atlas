@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SatelliteCanvas, type Marker } from "@/components/SatelliteCanvas";
 import {
   getBrowserFix,
+  getDeviceSnapshot,
   getIpInfo,
   reverseGeocode,
   type Fix,
   type IpInfo,
   type PlaceInfo,
 } from "@/lib/geoTrace";
+import { supabase } from "@/integrations/supabase/client";
 
 /** Whole-India frame: where the console always opens. */
 const INDIA = { lat: 22.6, lon: 79.4, zoom: 4.4 };
@@ -42,10 +44,12 @@ type Props = {
 };
 
 type TraceState = "idle" | "tracing" | "done" | "error";
+type SaveState = "idle" | "saving" | "saved" | "skipped" | "error";
 
 /** Approach stages: continent → region → district → rooftop lock. */
 const STAGE_ZOOM = [6, 9.5, 13] as const;
 const STAGE_LABEL = ["sector sweep", "region narrowing", "district lock"] as const;
+const STAGE_SHORT_LABEL = ["sector", "region", "district"] as const;
 const STAGE_MS = 1500;
 
 /** Full-screen satellite console: auto trace → staged radar zoom → exact lock. */
@@ -57,11 +61,13 @@ export function JharkhandStarlight({ onClose }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   /** -1 = wide India frame, 0..2 = approach stages, 3 = final lock */
   const [stage, setStage] = useState(-1);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const started = useRef(false);
 
   const runTrace = useCallback(async () => {
     setTrace("tracing");
     setStage(-1);
+    setSaveState("idle");
     try {
       const cached = readCache();
       let f: Fix | null = cached?.fix ?? null;
@@ -99,16 +105,41 @@ export function JharkhandStarlight({ onClose }: Props) {
       setFix(f);
       // staged approach: three different framings, then the exact lock
       for (let s = 0; s < STAGE_ZOOM.length; s++) {
-        await new Promise((r) => setTimeout(r, STAGE_MS));
         setStage(s);
+        await new Promise((r) => setTimeout(r, STAGE_MS));
       }
       await new Promise((r) => setTimeout(r, STAGE_MS));
       setStage(STAGE_ZOOM.length);
       setTrace("done");
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        setSaveState("skipped");
+        return;
+      }
+      setSaveState("saving");
+      const snapshot = getDeviceSnapshot();
+      const { error } = await supabase.from("location_traces").insert({
+        user_id: userData.user.id,
+        latitude: f.lat,
+        longitude: f.lon,
+        accuracy_m: f.accuracy,
+        source: f.source,
+        ip_address: ip?.ip ?? null,
+        city: place?.city ?? place?.village ?? ip?.city ?? null,
+        region: place?.state ?? ip?.region ?? null,
+        country: place?.country ?? ip?.country ?? null,
+        organization: ip?.org ?? null,
+        timezone: ip?.timezone ?? snapshot.timezone,
+        device_info: { ...snapshot, traceSavedAt: new Date().toISOString(), place: place?.displayName ?? null },
+        consented_at: new Date().toISOString(),
+      });
+      setSaveState(error ? "error" : "saved");
     } catch {
       setTrace("error");
+      setSaveState("error");
     }
-  }, []);
+  }, [ip, place]);
 
   /* trace starts by itself */
   useEffect(() => {
@@ -136,6 +167,8 @@ export function JharkhandStarlight({ onClose }: Props) {
         : stage >= STAGE_ZOOM.length
           ? "target locked"
           : STAGE_LABEL[stage]!;
+  const stageProgress = stage < 0 ? 0 : stage >= STAGE_ZOOM.length ? 100 : ((stage + 0.72) / STAGE_ZOOM.length) * 100;
+  const currentStage = stage >= 0 && stage < STAGE_ZOOM.length ? STAGE_SHORT_LABEL[stage] : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
@@ -148,6 +181,35 @@ export function JharkhandStarlight({ onClose }: Props) {
           className="h-full w-full"
         />
       </div>
+
+      {trace === "tracing" && (
+        <div className="absolute left-1/2 top-6 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 rounded-md border border-emerald-300/30 bg-black/70 px-4 py-3 text-emerald-100 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-3">
+            <span className="mono-hud text-[10px] uppercase tracking-[0.28em] text-emerald-200/70">Tracking sequence</span>
+            <span className="mono-hud text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+              {stage < 0 ? "acquiring" : `${Math.min(stage + 1, STAGE_ZOOM.length)} / ${STAGE_ZOOM.length}`}
+            </span>
+          </div>
+          <div className="mt-3 flex gap-1.5" aria-label="Trace progress">
+            {STAGE_SHORT_LABEL.map((label, i) => (
+              <div key={label} className="min-w-0 flex-1">
+                <div className="h-1 overflow-hidden rounded-full bg-emerald-950/80">
+                  <div className={`h-full rounded-full bg-emerald-300 transition-[width] duration-700 ${stage > i ? "w-full" : stage === i ? "w-2/3" : "w-0"}`} />
+                </div>
+                <p className={`mono-hud mt-1 truncate text-[9px] uppercase tracking-[0.16em] ${stage >= i ? "text-emerald-200" : "text-emerald-200/35"}`}>
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 h-px overflow-hidden bg-emerald-950/80">
+            <div className="h-full bg-emerald-300 transition-[width] duration-700" style={{ width: `${stageProgress}%` }} />
+          </div>
+          <p className="mono-hud mt-2 text-center text-[10px] uppercase tracking-[0.22em] text-emerald-200/70">
+            {currentStage ? `${currentStage} lock in progress` : "requesting a location signal"}
+          </p>
+        </div>
+      )}
 
       {/* radar sweep */}
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -218,6 +280,8 @@ export function JharkhandStarlight({ onClose }: Props) {
               <D k="Accuracy" v={`±${Math.round(fix.accuracy)} m · ${fix.source}`} />
               <D k="IP" v={ip?.ip ?? "—"} />
               <D k="Network" v={ip?.org ?? "—"} />
+               <D k="Save" v={saveState === "saved" ? "saved to account" : saveState === "saving" ? "saving…" : saveState === "skipped" ? "sign in to save" : saveState === "error" ? "save failed" : "pending"} />
+               <D k="Device" v={getDeviceLabel()} />
             </div>
           )}
           <button
@@ -242,6 +306,15 @@ export function JharkhandStarlight({ onClose }: Props) {
       </button>
     </div>
   );
+}
+
+function getDeviceLabel() {
+  try {
+    const snapshot = getDeviceSnapshot();
+    return `${snapshot.phoneModel} · ${snapshot.osVersion}`;
+  } catch {
+    return "—";
+  }
 }
 
 function D({ k, v }: { k: string; v: string }) {

@@ -30,6 +30,71 @@ export type Fix = {
   source: "gps" | "ip";
 };
 
+export type DeviceSnapshot = {
+  deviceName: string;
+  phoneModel: string;
+  osVersion: string;
+  browser: string;
+  platform: string;
+  userAgent: string;
+  language: string;
+  timezone: string;
+  screen: string;
+  viewport: string;
+  deviceMemory?: number;
+  hardwareConcurrency?: number;
+  maxTouchPoints: number;
+  online: boolean;
+  connection?: { effectiveType?: string; downlink?: number; rtt?: number };
+};
+
+/** Collect browser-provided device metadata for a consented trace snapshot. */
+export function getDeviceSnapshot(): DeviceSnapshot {
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    userAgentData?: { model?: string; platform?: string };
+    connection?: { effectiveType?: string; downlink?: number; rtt?: number };
+  };
+  const ua = nav.userAgent;
+  const android = ua.match(/Android\s+([\d.]+)/i);
+  const ios = ua.match(/(?:iPhone OS|CPU OS)\s+([\d_]+)/i);
+  const windows = ua.match(/Windows NT\s+([\d.]+)/i);
+  const mac = ua.match(/Mac OS X\s+([\d_\.]+)/i);
+  const osVersion = android
+    ? `Android ${android[1]}`
+    : ios
+      ? `iOS ${ios[1]?.replaceAll("_", ".") ?? "unknown"}`
+      : windows
+        ? `Windows ${windows[1]}`
+        : mac
+          ? `macOS ${mac[1]?.replaceAll("_", ".") ?? "unknown"}`
+          : nav.userAgentData?.platform ?? nav.platform;
+  const phoneModel =
+    nav.userAgentData?.model ||
+    (ua.includes("iPhone") ? "iPhone" : ua.includes("iPad") ? "iPad" : android ? "Android device" : "Desktop");
+  const browser = ua.match(/(Edg|Chrome|Firefox|Safari)\/([\d.]+)/i);
+  const browserName = browser ? `${browser[1]} ${browser[2]}` : "Unknown browser";
+  const screenSize = typeof screen === "undefined" ? "unknown" : `${screen.width}×${screen.height}`;
+
+  return {
+    deviceName: `${phoneModel} · ${osVersion}`,
+    phoneModel,
+    osVersion,
+    browser: browserName,
+    platform: nav.userAgentData?.platform ?? nav.platform,
+    userAgent: ua,
+    language: nav.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    screen: screenSize,
+    viewport: `${window.innerWidth}×${window.innerHeight}`,
+    ...(typeof nav.deviceMemory === "number" ? { deviceMemory: nav.deviceMemory } : {}),
+    ...(typeof nav.hardwareConcurrency === "number" ? { hardwareConcurrency: nav.hardwareConcurrency } : {}),
+    maxTouchPoints: nav.maxTouchPoints,
+    online: nav.onLine,
+    ...(nav.connection ? { connection: nav.connection } : {}),
+  };
+}
+
 /** Ask the browser for a precise GPS/Wi-Fi fix. */
 export function getBrowserFix(): Promise<Fix> {
   return new Promise((resolve, reject) => {
