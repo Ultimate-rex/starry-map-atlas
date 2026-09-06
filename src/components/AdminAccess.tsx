@@ -14,6 +14,7 @@ export function AdminAccess() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<"sign-in" | "create">("sign-in");
 
   useEffect(() => {
     let active = true;
@@ -32,18 +33,24 @@ export function AdminAccess() {
     };
   }, []);
 
-  const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
     setError("");
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    const result = mode === "create"
+      ? await supabase.auth.signUp({ email: email.trim(), password })
+      : await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
-    if (signInError) {
-      setError("Sign-in failed. Check your Cloud email and password.");
+    if (result.error) {
+      setError(mode === "create" ? "Account creation failed. Check the email and password, then try again." : "Sign-in failed. Check your Cloud email and password.");
+      setBusy(false);
+      return;
+    }
+
+    if (mode === "create" && !result.data.session) {
+      setError("Account created. Check your email to confirm it, then sign in here.");
+      setMode("sign-in");
       setBusy(false);
       return;
     }
@@ -75,6 +82,7 @@ export function AdminAccess() {
         size="sm"
         onClick={() => {
           setError("");
+           setMode("sign-in");
           setOpen(true);
         }}
         className="border-border/70 bg-background/80 backdrop-blur"
@@ -94,10 +102,10 @@ export function AdminAccess() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="mono-hud text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  Protected console
+                   Protected console
                 </p>
                 <h2 id="admin-login-title" className="mt-2 text-xl font-medium">
-                  Admin login
+                   {mode === "create" ? "Create Cloud account" : "Admin login"}
                 </h2>
               </div>
               <Button
@@ -111,7 +119,7 @@ export function AdminAccess() {
               </Button>
             </div>
 
-            <form onSubmit={signIn} className="mt-5 space-y-4">
+            <form onSubmit={submitAuth} className="mt-5 space-y-4">
               <label className="block text-sm">
                 <span className="mb-1.5 block text-muted-foreground">Cloud email</span>
                 <input
@@ -136,9 +144,20 @@ export function AdminAccess() {
               </label>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? "Checking access…" : "Continue to admin"}
+                {busy ? (mode === "create" ? "Creating account…" : "Checking access…") : (mode === "create" ? "Create account" : "Continue to admin")}
               </Button>
             </form>
+
+            <button
+              type="button"
+              className="mt-4 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              onClick={() => {
+                setError("");
+                setMode(mode === "create" ? "sign-in" : "create");
+              }}
+            >
+              {mode === "create" ? "Already have an account? Sign in" : "Need an account? Create one"}
+            </button>
 
             <p className="mt-4 text-xs leading-5 text-muted-foreground">
               Admin access uses Cloud authentication and a separate admin role. Credentials are never stored in the app.
