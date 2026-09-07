@@ -9,6 +9,13 @@ import {
   type IpInfo,
   type PlaceInfo,
 } from "@/lib/geoTrace";
+import {
+  buildTraceSnapshot,
+  downloadTraceJson,
+  persistLocalTrace,
+  saveTraceToDatabase,
+  type TraceSnapshot,
+} from "@/lib/traceSnapshot";
 import { supabase } from "@/integrations/supabase/client";
 
 /** Whole-India frame: where the console always opens. */
@@ -44,7 +51,7 @@ type Props = {
 };
 
 type TraceState = "idle" | "tracing" | "done" | "error";
-type SaveState = "idle" | "saving" | "saved" | "skipped" | "error";
+type SaveState = "idle" | "saving" | "saved" | "local" | "error";
 
 /** Approach stages: continent → region → district → rooftop lock. */
 const STAGE_ZOOM = [6, 9.5, 13] as const;
@@ -62,6 +69,7 @@ export function JharkhandStarlight({ onClose }: Props) {
   /** -1 = wide India frame, 0..2 = approach stages, 3 = final lock */
   const [stage, setStage] = useState(-1);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [snapshot, setSnapshot] = useState<TraceSnapshot | null>(null);
   const started = useRef(false);
 
   const runTrace = useCallback(async () => {
@@ -70,10 +78,12 @@ export function JharkhandStarlight({ onClose }: Props) {
     setSaveState("idle");
     try {
       const cached = readCache();
+      let resolvedIp = cached?.ip ?? null;
+      let resolvedPlace = cached?.place ?? null;
       let f: Fix | null = cached?.fix ?? null;
       if (cached) {
-        setIp(cached.ip);
-        setPlace(cached.place);
+        setIp(resolvedIp);
+        setPlace(resolvedPlace);
       }
 
       if (!f) {
@@ -82,6 +92,7 @@ export function JharkhandStarlight({ onClose }: Props) {
           getBrowserFix(),
         ]);
         const ipVal = ipRes.status === "fulfilled" ? ipRes.value : null;
+        resolvedIp = ipVal;
         if (ipVal) setIp(ipVal);
         f =
           fixRes.status === "fulfilled"
@@ -98,11 +109,13 @@ export function JharkhandStarlight({ onClose }: Props) {
 
         const fixed = f;
         const p = await reverseGeocode(fixed.lat, fixed.lon).catch(() => null);
+        resolvedPlace = p;
         if (p) setPlace(p);
         writeCache({ fix: fixed, place: p, ip: ipVal, ts: Date.now() });
       }
 
-      setFix(f);
+      const fixed = f;
+      setFix(fixed);
       // staged approach: three different framings, then the exact lock
       for (let s = 0; s < STAGE_ZOOM.length; s++) {
         setStage(s);
@@ -113,33 +126,25 @@ export function JharkhandStarlight({ onClose }: Props) {
       setTrace("done");
 
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        setSaveState("skipped");
-        return;
-      }
-      setSaveState("saving");
       const snapshot = getDeviceSnapshot();
-      const { error } = await supabase.from("location_traces").insert({
-        user_id: userData.user.id,
-        latitude: f.lat,
-        longitude: f.lon,
-        accuracy_m: f.accuracy,
-        source: f.source,
-        ip_address: ip?.ip ?? null,
-        city: place?.city ?? place?.village ?? ip?.city ?? null,
-        region: place?.state ?? ip?.region ?? null,
-        country: place?.country ?? ip?.country ?? null,
-        organization: ip?.org ?? null,
-        timezone: ip?.timezone ?? snapshot.timezone,
-        device_info: { ...snapshot, traceSavedAt: new Date().toISOString(), place: place?.displayName ?? null },
-        consented_at: new Date().toISOString(),
-      });
-      setSaveState(error ? "error" : "saved");
+      const savedSnapshot = buildTraceSnapshot(fixed, resolvedIp, resolvedPlace, snapshot, userData.user?.id ?? null);
+      setSnapshot(savedSnapshot);
+      persistLocalTrace(savedSnapshot);
+      setSaveState(userData.user ? "saving" : "local");
+      if (userData.user) {
+        try {
+          await saveTraceToDatabase(savedSnapshot, userData.user.id);
+          setSaveState("saved");
+        } catch {
+          // The local user.json remains available even if auth/database is offline.
+          setSaveState("error");
+        }
+      }
     } catch {
       setTrace("error");
       setSaveState("error");
     }
-  }, [ip, place]);
+  }, []);
 
   /* trace starts by itself */
   useEffect(() => {
@@ -280,8 +285,17 @@ export function JharkhandStarlight({ onClose }: Props) {
               <D k="Accuracy" v={`±${Math.round(fix.accuracy)} m · ${fix.source}`} />
               <D k="IP" v={ip?.ip ?? "—"} />
               <D k="Network" v={ip?.org ?? "—"} />
-               <D k="Save" v={saveState === "saved" ? "saved to account" : saveState === "saving" ? "saving…" : saveState === "skipped" ? "sign in to save" : saveState === "error" ? "save failed" : "pending"} />
+                <D k="Save" v={saveState === "saved" ? "database + user.json" : saveState === "saving" ? "saving…" : saveState === "local" ? "user.json (local)" : saveState === "error" ? "local saved · database failed" : "pending"} />
                <D k="Device" v={getDeviceLabel()} />
+                {snapshot && (
+                  <button
+                    type="button"
+                    onClick={() => downloadTraceJson(snapshot)}
+                    className="mt-2 w-full border border-emerald-400/30 px-2 py-1.5 text-[10px] uppercase tracking-[0.16em] text-emerald-300 transition-colors hover:bg-emerald-400/10"
+                  >
+                    Download user.json
+                  </button>
+                )}
             </div>
           )}
           <button
