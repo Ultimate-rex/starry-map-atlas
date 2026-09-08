@@ -400,6 +400,26 @@
   transform-origin: center;
 }
 
+@keyframes radar-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--focus-line) 0%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus-line) 25%, transparent);
+  }
+}
+
+.radar-pulse {
+  animation: radar-pulse 1.4s ease-in-out infinite;
+}
+
+.trace-hud {
+  animation: hud-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @keyframes trace-in {
   from {
     opacity: 0;

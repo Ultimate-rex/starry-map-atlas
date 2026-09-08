@@ -70,7 +70,25 @@ export function JharkhandStarlight({ onClose }: Props) {
   const [stage, setStage] = useState(-1);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [snapshot, setSnapshot] = useState<TraceSnapshot | null>(null);
+  const [utc, setUtc] = useState("");
   const started = useRef(false);
+
+  useEffect(() => {
+    const updateClock = () => {
+      setUtc(
+        new Intl.DateTimeFormat("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+          timeZone: "UTC",
+        }).format(new Date()),
+      );
+    };
+    updateClock();
+    const timer = window.setInterval(updateClock, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const runTrace = useCallback(async () => {
     setTrace("tracing");
@@ -166,14 +184,31 @@ export function JharkhandStarlight({ onClose }: Props) {
 
   const statusText =
     trace === "error"
-      ? "signal lost"
+      ? "trace failed"
       : stage < 0
         ? "acquiring signal"
         : stage >= STAGE_ZOOM.length
-          ? "target locked"
+          ? "location locked"
           : STAGE_LABEL[stage]!;
   const stageProgress = stage < 0 ? 0 : stage >= STAGE_ZOOM.length ? 100 : ((stage + 0.72) / STAGE_ZOOM.length) * 100;
   const currentStage = stage >= 0 && stage < STAGE_ZOOM.length ? STAGE_SHORT_LABEL[stage] : null;
+  const signalLabel = fix
+    ? fix.source === "gps"
+      ? fix.accuracy <= 100
+        ? "GPS / HIGH CONFIDENCE"
+        : "GPS / REFINING"
+      : "IP / APPROXIMATE"
+    : "SEARCHING";
+  const saveLabel =
+    saveState === "saved"
+      ? "SNAPSHOT SAVED"
+      : saveState === "saving"
+        ? "SAVING SNAPSHOT"
+        : saveState === "local"
+          ? "LOCAL SNAPSHOT"
+          : saveState === "error"
+            ? "SAVE ATTENTION"
+            : "STANDBY";
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
@@ -187,34 +222,42 @@ export function JharkhandStarlight({ onClose }: Props) {
         />
       </div>
 
-      {trace === "tracing" && (
-        <div className="absolute left-1/2 top-6 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 rounded-md border border-emerald-300/30 bg-black/70 px-4 py-3 text-emerald-100 backdrop-blur-md">
-          <div className="flex items-center justify-between gap-3">
-            <span className="mono-hud text-[10px] uppercase tracking-[0.28em] text-emerald-200/70">Tracking sequence</span>
-            <span className="mono-hud text-[10px] uppercase tracking-[0.2em] text-emerald-300">
-              {stage < 0 ? "acquiring" : `${Math.min(stage + 1, STAGE_ZOOM.length)} / ${STAGE_ZOOM.length}`}
+      <div className="trace-hud absolute left-1/2 top-5 w-[min(38rem,calc(100vw-2rem))] -translate-x-1/2 border border-emerald-300/30 bg-black/75 px-4 py-3 text-emerald-100 backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className={`h-1.5 w-1.5 rounded-full ${trace === "error" ? "bg-destructive" : trace === "done" ? "bg-emerald-300" : "bg-amber-300 radar-pulse"}`} />
+            <span className="mono-hud text-[10px] uppercase tracking-[0.28em] text-emerald-100/80">
+              {trace === "done" ? "Location trace / locked" : trace === "error" ? "Location trace / attention" : "Location trace / live"}
             </span>
           </div>
-          <div className="mt-3 flex gap-1.5" aria-label="Trace progress">
-            {STAGE_SHORT_LABEL.map((label, i) => (
-              <div key={label} className="min-w-0 flex-1">
-                <div className="h-1 overflow-hidden rounded-full bg-emerald-950/80">
-                  <div className={`h-full rounded-full bg-emerald-300 transition-[width] duration-700 ${stage > i ? "w-full" : stage === i ? "w-2/3" : "w-0"}`} />
-                </div>
-                <p className={`mono-hud mt-1 truncate text-[9px] uppercase tracking-[0.16em] ${stage >= i ? "text-emerald-200" : "text-emerald-200/35"}`}>
-                  {label}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 h-px overflow-hidden bg-emerald-950/80">
-            <div className="h-full bg-emerald-300 transition-[width] duration-700" style={{ width: `${stageProgress}%` }} />
-          </div>
-          <p className="mono-hud mt-2 text-center text-[10px] uppercase tracking-[0.22em] text-emerald-200/70">
-            {currentStage ? `${currentStage} lock in progress` : "requesting a location signal"}
-          </p>
+          <span className="mono-hud text-[10px] tabular-nums tracking-[0.18em] text-emerald-300/80">UTC {utc || "--:--:--"}</span>
         </div>
-      )}
+
+        <div className="mt-3 grid grid-cols-3 gap-2 border-y border-emerald-300/15 py-2">
+          <Telemetry label="Signal" value={signalLabel} />
+          <Telemetry label="Stage" value={stage < 0 ? "HANDSHAKE" : stage >= STAGE_ZOOM.length ? "FINAL LOCK" : `${stage + 1} / ${STAGE_ZOOM.length}`} />
+          <Telemetry label="Archive" value={saveLabel} />
+        </div>
+
+        <div className="mt-3 flex gap-1.5" aria-label="Location trace progress">
+          {STAGE_SHORT_LABEL.map((label, i) => (
+            <div key={label} className="min-w-0 flex-1">
+              <div className="h-1 overflow-hidden rounded-full bg-emerald-950/80">
+                <div className={`h-full rounded-full bg-emerald-300 transition-[width] duration-700 ${stage > i ? "w-full" : stage === i ? "w-2/3" : "w-0"}`} />
+              </div>
+              <p className={`mono-hud mt-1 truncate text-[9px] uppercase tracking-[0.16em] ${stage >= i ? "text-emerald-200" : "text-emerald-200/35"}`}>
+                {label}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 h-px overflow-hidden bg-emerald-950/80">
+          <div className="h-full bg-emerald-300 transition-[width] duration-700" style={{ width: `${stageProgress}%` }} />
+        </div>
+        <p className="mono-hud mt-2 text-center text-[10px] uppercase tracking-[0.22em] text-emerald-200/70">
+          {currentStage ? `${currentStage} lock in progress` : trace === "done" ? "coordinates verified and archived" : trace === "error" ? "restart the trace to try again" : "requesting location permission"}
+        </p>
+      </div>
 
       {/* radar sweep */}
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -303,7 +346,7 @@ export function JharkhandStarlight({ onClose }: Props) {
             onClick={() => setShowDetails((s) => !s)}
             className="mono-hud rounded-full border border-emerald-400/50 bg-black/70 px-3 py-1.5 text-[10px] uppercase tracking-[0.25em] text-emerald-300 backdrop-blur transition-colors hover:bg-emerald-400/15"
           >
-            {showDetails ? "hide" : place?.district ?? "details"}
+            {showDetails ? "hide details" : place?.district ?? "view details"}
           </button>
         </div>
       )}
@@ -329,6 +372,15 @@ function getDeviceLabel() {
   } catch {
     return "—";
   }
+}
+
+function Telemetry({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="mono-hud text-[8px] uppercase tracking-[0.18em] text-emerald-200/45">{label}</p>
+      <p className="mono-hud mt-1 truncate text-[9px] uppercase tracking-[0.08em] text-emerald-200">{value}</p>
+    </div>
+  );
 }
 
 function D({ k, v }: { k: string; v: string }) {
