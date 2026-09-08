@@ -49,7 +49,7 @@ export function AdminMap({ records, selectedId, onSelect }: Props) {
   const graticule = useMemo(() => path(geoGraticule10()) ?? "", [path]);
   const selected = records.find((record) => record.id === selectedId) ?? null;
   const statePaths = useMemo(() => {
-    const fc = INDIA_STATES.India;
+     const fc = INDIA_STATES["India"];
     if (!fc) return [] as { d: string; name: string | null }[];
     return fc.features
       .map((f) => ({ d: path(f) ?? "", name: f.properties?.name ?? null }))
@@ -72,7 +72,7 @@ export function AdminMap({ records, selectedId, onSelect }: Props) {
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${width} ${height}`}>
           <path d={statePath(INDIA) ?? ""} fill="none" className="stroke-white/75" strokeWidth={1.2} />
           {statePaths.map((state, index) => {
-            const feature = INDIA_STATES.India?.features[index];
+             const feature = INDIA_STATES["India"]?.features[index];
             return feature ? (
               <path
                 key={state.name ?? index}
