@@ -4,8 +4,6 @@ import { AdminAccess } from "@/components/AdminAccess";
 import { AdminMap, type TraceRecord } from "@/components/AdminMap";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { getBrowserFix, getDeviceSnapshot, getIpInfo, reverseGeocode, type Fix, type IpInfo, type PlaceInfo } from "@/lib/geoTrace";
-import { buildTraceSnapshot, persistLocalTrace, saveTraceToDatabase } from "@/lib/traceSnapshot";
 
 type PanelState = "checking" | "signed-out" | "not-admin" | "ready" | "error";
 
@@ -36,7 +34,6 @@ function AdminPage() {
   const [records, setRecords] = useState<TraceRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [adminTraceState, setAdminTraceState] = useState<"idle" | "tracing" | "saved" | "error">("idle");
 
   const loadRecords = useCallback(async () => {
     const { data, error } = await supabase
@@ -108,30 +105,6 @@ function AdminPage() {
     await navigate({ to: "/", replace: true });
   };
 
-  const traceAdminLocation = async () => {
-    setAdminTraceState("tracing");
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("signed out");
-      const [ipResult, gpsResult] = await Promise.allSettled([getIpInfo(), getBrowserFix()]);
-      const ip: IpInfo | null = ipResult.status === "fulfilled" ? ipResult.value : null;
-      const fix: Fix | null = gpsResult.status === "fulfilled"
-        ? gpsResult.value
-        : ip?.lat != null && ip.lon != null
-          ? { lat: ip.lat, lon: ip.lon, accuracy: 5000, source: "ip" }
-          : null;
-      if (!fix) throw new Error("no location");
-      const place: PlaceInfo | null = await reverseGeocode(fix.lat, fix.lon).catch(() => null);
-      const snapshot = buildTraceSnapshot(fix, ip, place, getDeviceSnapshot(), userData.user.id);
-      persistLocalTrace(snapshot);
-      await saveTraceToDatabase(snapshot, userData.user.id);
-      setAdminTraceState("saved");
-      await loadRecords();
-    } catch {
-      setAdminTraceState("error");
-    }
-  };
-
   const selected = records.find((record) => record.id === selectedId) ?? null;
 
   return (
@@ -143,9 +116,6 @@ function AdminPage() {
         </div>
         <div className="flex items-center gap-2">
           <AdminAccess />
-          <Button type="button" variant="destructive" size="sm" onClick={() => void traceAdminLocation()} disabled={adminTraceState === "tracing"}>
-            {adminTraceState === "tracing" ? "Tracing…" : adminTraceState === "saved" ? "Admin trace saved" : "Trace admin location"}
-          </Button>
           <Button type="button" variant="ghost" size="sm" onClick={() => void signOut()}>
             Sign out
           </Button>
